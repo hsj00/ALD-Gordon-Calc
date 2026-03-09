@@ -15,15 +15,14 @@
 
 from __future__ import annotations  # ← 수정: 타입 힌트 호환성
 
-from dataclasses import dataclass
-from typing import Any, Dict, Optional
-
+import streamlit as st
 import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
-import streamlit as st
 from plotly.subplots import make_subplots
 from scipy.integrate import cumulative_trapezoid, solve_ivp
+from dataclasses import dataclass
+from typing import Any, Dict, Optional
 
 # ── 물리 상수 ─────────────────────────────────────────────────
 k_B: float = 1.380649e-23   # J/K
@@ -541,14 +540,19 @@ PRESETS: Dict[str, Dict[str, Any]] = {  # ← 수정: 프리셋 추가
         "T_C": 250.0, "P_mTorr": 100.0,
         "desc": "FinFET gate-all-around HfO₂. 낮은 AR로 쉬운 코팅."
     },
-    "Flash WL Mo Fill": {  # ← 수정: Mo ALD 프리셋 추가
-        "structure": "Cylindrical Hole",
-        "L_um": 6.0, "w_nm": 50.0,
+    "Flash WL Mo Fill": {  # ← 수정: 구조를 Infinite Trench로 변경, 치수 보정
+        "structure": "Infinite Trench",
+        "L_um": 3.0, "w_nm": 20.0,
         "prec": "MoO₂Cl₂  [Mo metal]",
         "film": "Mo",
-        "T_C": 500.0, "P_mTorr": 300.0,
-        "desc": "Flash memory word line Mo fill (MoO₂Cl₂ + H₂). "
-               "매우 높은 AR=120:1."
+        "T_C": 650.0, "P_mTorr": 80.0,
+        "desc": "3D NAND word line Mo fill (MoO₂Cl₂ + H₂). "
+               "Replacement gate 공정에서 precursor는 수직 slit을 통해 진입 후 "
+               "수평 lateral recess cavity를 채웁니다. "
+               "구조: Infinite Trench (양면 slit 진입). "
+               "L ≈ slit~channel hole 간 lateral 거리 (~3 μm), "
+               "w ≈ WL gate height (~20 nm, z-pitch ~40 nm의 절반). "
+               "EAR = L/(2w) = 75:1."
     },
 }
 
