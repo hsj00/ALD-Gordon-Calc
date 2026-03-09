@@ -1,3 +1,4 @@
+
 # ALD Gordon Model Calculator v5 — User Manual
 
 > Gordon et al. *Chem. Vap. Deposition* 9, 73 (2003) · Cremers et al. *Appl. Phys. Rev.* 6, 021302 (2019)
@@ -85,12 +86,12 @@ where `a` is the Equivalent Aspect Ratio (EAR).
 Structures with the same geometric AR can have very different coating difficulty depending on shape:
 
 | Structure           | EAR Formula      | Example (L=5 μm, w=100 nm) |
-| ------------------- | ---------------- | --------------------------- |
-| Cylindrical Hole    | a = L/w          | 50                          |
-| Square Hole         | a = L/w          | 50                          |
-| Infinite Trench     | a = L/(2w)       | 25                          |
-| Elongated Hole      | a = L(w+z)/(2wz) | Geometry dependent          |
-| Square Pillar Array | a = L/(2√2·w)  | 17.7                        |
+| ------------------- | ---------------- | -------------------------- |
+| Cylindrical Hole    | a = L/w          | 50                         |
+| Square Hole         | a = L/w          | 50                         |
+| Infinite Trench     | a = L/(2w)       | 25                         |
+| Elongated Hole      | a = L(w+z)/(2wz) | Geometry dependent         |
+| Square Pillar Array | a = L/(2√2·w)    | 17.7                       |
 
  **Key insight** : A trench is open on both sides, so EAR = AR/2. The same AR is twice as easy to coat in a trench as in a hole.
 
@@ -132,16 +133,16 @@ Kn = λ/w,   λ = k_B·T / (√2·π·d²·P)
 
  **Representative values** :
 
-| Structure                  | Typical Depth (L) | Typical Width (w) | AR         |
-| -------------------------- | ----------------- | ----------------- | ---------- |
-| DRAM Capacitor (DDR4)      | 3–5 μm          | 60–100 nm        | 40–80:1   |
-| DRAM Capacitor (DDR5+)     | 5–8 μm          | 40–70 nm         | 80–150:1  |
-| 3D NAND 96L Channel Hole   | 6–7 μm          | 100–140 nm       | 50–70:1   |
-| 3D NAND 128L Channel Hole  | 8–9 μm          | 100–120 nm       | 70–90:1   |
-| 3D NAND 200L+ Channel Hole | 12–15 μm        | 90–110 nm        | 120–160:1 |
-| 3D NAND Slit (Trench)      | 6–10 μm         | 100–200 nm       | 30–100:1  |
-| FinFET Gate Trench         | 40–60 nm         | 7–20 nm          | 2–8:1     |
-| GAA Nanosheet Gap          | 8–12 nm          | 8–12 nm          | ~1:1       |
+| Structure                  | Typical Depth (L) | Typical Width (w) | AR        |
+| -------------------------- | ----------------- | ----------------- | --------- |
+| DRAM Capacitor (DDR4)      | 3–5 μm            | 60–100 nm         | 40–80:1   |
+| DRAM Capacitor (DDR5+)     | 5–8 μm            | 40–70 nm          | 80–150:1  |
+| 3D NAND 96L Channel Hole   | 6–7 μm            | 100–140 nm        | 50–70:1   |
+| 3D NAND 128L Channel Hole  | 8–9 μm            | 100–120 nm        | 70–90:1   |
+| 3D NAND 200L+ Channel Hole | 12–15 μm          | 90–110 nm         | 120–160:1 |
+| 3D NAND Slit (Trench)      | 6–10 μm           | 100–200 nm        | 30–100:1  |
+| FinFET Gate Trench         | 40–60 nm          | 7–20 nm           | 2–8:1     |
+| GAA Nanosheet Gap          | 8–12 nm           | 8–12 nm           | ~1:1      |
 
  **Practical tip** : Use the narrowest point (bottleneck) in the structure for w. For tapered etch profiles, the minimum CD gives the most conservative (safest) result.
 
@@ -157,15 +158,15 @@ Kn = λ/w,   λ = k_B·T / (√2·π·d²·P)
 
 **Literature values** (from Gordon 2003, Cremers 2019):
 
-| Precursor            | Film          | s₀        | Source                  |
-| -------------------- | ------------- | ---------- | ----------------------- |
-| TMA [Al(CH₃)₃]     | Al₂O₃       | ~0.01      | Cremers (2019)          |
-| TiCl₄               | TiO₂/TiN     | ~0.006     | Cremers (2019)          |
-| TEMAHf [Hf(NEtMe)₄] | HfO₂         | ~0.1       | Gordon (2003)           |
-| DEZ [Zn(C₂H₅)₂]   | ZnO           | ~0.007     | Gordon (2003)           |
-| BDEAS                | SiO₂ (PEALD) | ~3×10⁻⁵ | Literature estimate     |
-| MoCl₅               | Mo            | ~0.05      | Limited data — measure |
-| MoO₂Cl₂            | Mo            | ~0.04      | Limited data — measure |
+| Precursor           | Film         | s₀      | Source                 |
+| ------------------- | ------------ | ------- | ---------------------- |
+| TMA [Al(CH₃)₃]      | Al₂O₃        | ~0.01   | Cremers (2019)         |
+| TiCl₄               | TiO₂/TiN     | ~0.006  | Cremers (2019)         |
+| TEMAHf [Hf(NEtMe)₄] | HfO₂         | ~0.1    | Gordon (2003)          |
+| DEZ [Zn(C₂H₅)₂]     | ZnO          | ~0.007  | Gordon (2003)          |
+| BDEAS               | SiO₂ (PEALD) | ~3×10⁻⁵ | Literature estimate    |
+| MoCl₅               | Mo           | ~0.05   | Limited data — measure |
+| MoO₂Cl₂             | Mo           | ~0.04   | Limited data — measure |
 
  **Caution** : s₀ is highly dependent on process temperature, surface termination, and co-reactant type. For accurate process optimization, experimental measurement is essential. Literature values should only be used for initial design estimates.
 
@@ -179,14 +180,14 @@ Kn = λ/w,   λ = k_B·T / (√2·π·d²·P)
 
  **Representative values** :
 
-| Film                              | Typical GPC (nm/cycle) |
-| --------------------------------- | ---------------------- |
-| Al₂O₃ (TMA+H₂O)                | 0.08–0.12             |
-| TiO₂ (TiCl₄+H₂O)               | 0.04–0.06             |
-| HfO₂ (TEMAHf+H₂O)               | 0.08–0.12             |
-| ZnO (DEZ+H₂O)                    | 0.15–0.22             |
-| SiO₂ (BDEAS+O₂ plasma)          | 0.10–0.15             |
-| Mo (MoCl₅+H₂, or MoO₂Cl₂+H₂) | 0.03–0.06             |
+| Film                         | Typical GPC (nm/cycle) |
+| ---------------------------- | ---------------------- |
+| Al₂O₃ (TMA+H₂O)              | 0.08–0.12              |
+| TiO₂ (TiCl₄+H₂O)             | 0.04–0.06              |
+| HfO₂ (TEMAHf+H₂O)            | 0.08–0.12              |
+| ZnO (DEZ+H₂O)                | 0.15–0.22              |
+| SiO₂ (BDEAS+O₂ plasma)       | 0.10–0.15              |
+| Mo (MoCl₅+H₂, or MoO₂Cl₂+H₂) | 0.03–0.06              |
 
 ### 4.4 K_max (Maximum Surface Adsorption Density)
 
@@ -359,23 +360,65 @@ Each result shows a 🟢🟡🔴 indicator with a one-line interpretation:
 * 🟡 Kn 0.1–10: Transition regime. Approximate application
 * 🔴 Kn < 0.1: Viscous flow. Fluid-like behavior. Navier-Stokes-based models needed
 
-### 6.3 Saturation Ratio Interpretation
+### 6.3 Dose Multiple (HAR vs. Flat Substrate) — v5.1 New
+
+**What is this?**
+
+In ALD, you often hear that "100× to 1000× more exposure is needed compared to flat substrates." The **Dose Multiple** metric in this calculator quantifies exactly this ratio.
+
+```
+Dose Multiple = E_required(HAR structure) / E_flat(flat substrate saturation)
+```
+
+where:
+
+* `E_flat = K_max × √(2πmkBT) / s₀` — minimum exposure to complete one cycle of surface reaction on a flat substrate
+* `E_required` — Gordon model's predicted conformal coating exposure for the HAR structure
+
+ **Literature basis (Cremers et al. 2019)** :
+
+Gordon et al. estimated that the exposure required to saturate a flat surface with Hf(NMe₂)₄ during HfO₂ ALD at 200°C is in the range of 3–43 L. To deposit a conformal coating of HfO₂ into holes with a pore diameter of 0.17 μm and a depth of 7.3 μm (AR ≈ 43:1), an exposure of 9,000 L was required. This is approximately **200–3,000×** the flat substrate dose.
+
+**A large Dose Multiple does not mean the process is flawed.** It is a physical consequence of diffusion limitation in high-aspect-ratio structures.
+
+| Dose Multiple | Meaning                   | Typical Conditions    |
+| ------------- | ------------------------- | --------------------- |
+| < 10×         | Similar to flat substrate | Low AR (< 5:1)        |
+| 10–100×       | Dose extension needed     | Moderate AR (5–20:1)  |
+| 100–1000×     | Standard HAR range        | DRAM cap, 3D NAND     |
+| > 1000×       | Extreme conditions        | 200L+ NAND, ultra-HAR |
+
+ **Critical distinction — Dose Multiple ≠ Saturation Ratio** :
+
+Confusing these two concepts is extremely common:
+
+| Ratio                | Definition            | Denominator               | What ≥100% means                   |
+| -------------------- | --------------------- | ------------------------- | ---------------------------------- |
+| **Dose Multiple**    | E_req(HAR) / E_flat   | Flat substrate saturation | HAR coating is N× harder than flat |
+| **Saturation Ratio** | E_actual / E_req(HAR) | Gordon Required           | **Conformal coating achieved**     |
+
+* **Dose Multiple** 200×: "This structure requires 200× more exposure than a flat substrate" → already reflected in Gordon Required
+* **Saturation Ratio** 100%: "The actual exposure supplied equals the Gordon-predicted requirement" → **conformal coating achieved**
+
+ **Conclusion** : The "100–1000× vs. flat substrate" statement refers to the Dose Multiple, which is already incorporated into the Gordon Required Exposure. When Saturation Ratio ≥ 100%, conformal coating is achieved — no additional multiplicative factor is needed.
+
+### 6.4 Saturation Ratio Interpretation
 
 The ratio of actual exposure to required exposure indicates coating completeness:
 
-| Saturation | Meaning                    | Coverage Profile                 | Action                                                |
-| ---------- | -------------------------- | -------------------------------- | ----------------------------------------------------- |
-| ≥ 100%    | Sufficient                 | Uniform GPC to bottom            | Maintain conditions (excess wastes time)              |
-| 90–99%    | Nearly achieved            | Slight thinning at bottom 5–10% | Slightly increase dose time                           |
-| 70–89%    | Insufficient               | Significant bare area at bottom  | Increase dose time or pressure by 1.2–1.5×          |
-| 50–69%    | Significantly insufficient | > half of structure uncoated     | Fundamental condition change needed                   |
-| < 50%      | Critical                   | No meaningful coating            | Redesign fill tank capacity, pump, precursor strategy |
+| Saturation | Meaning                    | Coverage Profile                | Action                                                |
+| ---------- | -------------------------- | ------------------------------- | ----------------------------------------------------- |
+| ≥ 100%     | Sufficient                 | Uniform GPC to bottom           | Maintain conditions (excess wastes time)              |
+| 90–99%     | Nearly achieved            | Slight thinning at bottom 5–10% | Slightly increase dose time                           |
+| 70–89%     | Insufficient               | Significant bare area at bottom | Increase dose time or pressure by 1.2–1.5×            |
+| 50–69%     | Significantly insufficient | > half of structure uncoated    | Fundamental condition change needed                   |
+| < 50%      | Critical                   | No meaningful coating           | Redesign fill tank capacity, pump, precursor strategy |
 
-### 6.4 Fill Tank Model A vs. B Difference
+### 6.5 Fill Tank Model A vs. B Difference
 
 | Model              | Definition                                        | Meaning                          |
 | ------------------ | ------------------------------------------------- | -------------------------------- |
-| A: P_eq × t_dose  | Exposure upper bound (assumes constant P_eq)      | Optimistic estimate              |
+| A: P_eq × t_dose   | Exposure upper bound (assumes constant P_eq)      | Optimistic estimate              |
 | B: ODE integration | Actual exposure accounting for pressure transient | Realistic estimate (recommended) |
 
  **When the two differ significantly (> 20%)** :
@@ -387,7 +430,7 @@ The ratio of actual exposure to required exposure indicates coating completeness
 
 * Fast-fill approximation is valid. Current valve/plumbing design is adequate
 
-### 6.5 Time-Resolved Penetration Depth
+### 6.6 Time-Resolved Penetration Depth
 
  **l(t) graph elements** :
 
@@ -460,12 +503,12 @@ dP_c/dt =  C(P_f − P_c) / V_c − S·P_c / V_c   (chamber pressure change)
 
 ### 8.3 Practical Decision Criteria
 
-| Condition          | Meaning                            | Action                                   |
-| ------------------ | ---------------------------------- | ---------------------------------------- |
+| Condition          | Meaning                            | Action                                  |
+| ------------------ | ---------------------------------- | --------------------------------------- |
 | E_max > E_required | 100% coating is possible           | Set t_dose ≥ t_full                     |
 | E_max < E_required | 100% coating impossible            | Increase ΔP, V_fill, or decrease S_pump |
-| t_dose/τ < 0.5    | Dose time too short                | Extending t_dose is effective            |
-| t_dose/τ > 3      | Diminishing returns from more time | Increase ΔP or V_fill instead           |
+| t_dose/τ < 0.5     | Dose time too short                | Extending t_dose is effective           |
+| t_dose/τ > 3       | Diminishing returns from more time | Increase ΔP or V_fill instead           |
 
 ---
 
