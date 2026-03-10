@@ -546,7 +546,7 @@ PRESETS: Dict[str, Dict[str, Any]] = {  # ← 수정: 프리셋 추가
         "L_um": 3.0, "w_nm": 20.0,
         "prec": "MoO₂Cl₂  [Mo metal]",
         "film": "Mo",
-        "T_C": 650.0, "P_Torr": 60,  # ← 수정: Torr 단위로 변경
+        "T_C": 650.0, "P_Torr": 60.0,  # ← 수정: Torr 단위로 변경
         "desc": "3D NAND word line Mo fill (MoO₂Cl₂ + H₂). "
                "Replacement gate 공정에서 precursor는 수직 slit을 통해 진입 후 "
                "수평 lateral recess cavity를 채웁니다. "
@@ -616,13 +616,13 @@ def main() -> None:
             default_T = preset["T_C"]
             default_P_Torr = preset["P_Torr"]  # ← 수정: Torr 기준
         else:
-            default_structure = "Flash WL Mo Fill"
-            default_L = 20.0
-            default_w = 20.0
+            default_structure = "Cylindrical Hole"
+            default_L = 2.0
+            default_w = 100.0
             default_prec = "MoO₂Cl₂  [Mo metal]"
             default_film = "Mo"
             default_T = 650.0
-            default_P_Torr = 60.0  # ← 수정: 60 Torr = 60000 mTorr
+            default_P_Torr = 60.0  # ← 수정: 60.0 Torr = 60000 mTorr
 
         st.header("Structure (Geometry)")
         structure = st.selectbox(
@@ -1512,4 +1512,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-    
