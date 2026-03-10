@@ -15,14 +15,15 @@
 
 from __future__ import annotations  # ← 수정: 타입 힌트 호환성
 
-import streamlit as st
+from dataclasses import dataclass
+from typing import Any, Dict, Optional
+
 import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
+import streamlit as st
 from plotly.subplots import make_subplots
 from scipy.integrate import cumulative_trapezoid, solve_ivp
-from dataclasses import dataclass
-from typing import Any, Dict, Optional
 
 # ── 물리 상수 ─────────────────────────────────────────────────
 k_B: float = 1.380649e-23   # J/K
@@ -486,6 +487,7 @@ PRECURSORS: Dict[str, Dict[str, Any]] = {
 }
 
 FILMS: Dict[str, Dict[str, float]] = {
+    "Mo":    {"rho": 10.2, "MW_f": 95.95},
     "Al₂O₃": {"rho": 3.0, "MW_f": 101.96},
     "TiO₂":  {"rho": 4.0, "MW_f": 79.87},
     "ZnO":   {"rho": 5.6, "MW_f": 81.38},
@@ -493,7 +495,6 @@ FILMS: Dict[str, Dict[str, float]] = {
     "ZrO₂":  {"rho": 5.7, "MW_f": 123.22},
     "SiO₂":  {"rho": 2.2, "MW_f": 60.09},
     "TiN":   {"rho": 5.2, "MW_f": 61.89},
-    "Mo":    {"rho": 10.2, "MW_f": 95.95},
     "Custom": {"rho": 4.0, "MW_f": 100.0},
 }
 
@@ -512,7 +513,7 @@ PRESETS: Dict[str, Dict[str, Any]] = {  # ← 수정: 프리셋 추가
         "L_um": 4.0, "w_nm": 80.0,
         "prec": "TEMAHf  [Hf(NEtMe)₄]",
         "film": "HfO₂",
-        "T_C": 250.0, "P_mTorr": 100.0,
+        "T_C": 250.0, "P_Torr": 0.1,  # ← 수정: Torr 단위로 변경
         "desc": "DRAM 커패시터 유전체 (HfO₂). AR≈50:1."
     },
     "3D NAND Slit (V-NAND)": {
@@ -520,7 +521,7 @@ PRESETS: Dict[str, Dict[str, Any]] = {  # ← 수정: 프리셋 추가
         "L_um": 8.0, "w_nm": 120.0,
         "prec": "TMA  [Al(CH₃)₃]",
         "film": "Al₂O₃",
-        "T_C": 300.0, "P_mTorr": 200.0,
+        "T_C": 300.0, "P_Torr": 0.2,  # ← 수정: Torr 단위로 변경
         "desc": "3D NAND 슬릿 구조 Al₂O₃ blocking oxide. "
                "Trench이므로 EAR=AR/2."
     },
@@ -529,7 +530,7 @@ PRESETS: Dict[str, Dict[str, Any]] = {  # ← 수정: 프리셋 추가
         "L_um": 10.0, "w_nm": 100.0,
         "prec": "TMA  [Al(CH₃)₃]",
         "film": "Al₂O₃",
-        "T_C": 300.0, "P_mTorr": 200.0,
+        "T_C": 300.0, "P_Torr": 0.2,  # ← 수정: Torr 단위로 변경
         "desc": "3D NAND 채널 홀 (128L 이상). AR=100:1. 극한 구조."
     },
     "FinFET Gate (Low AR)": {
@@ -537,15 +538,15 @@ PRESETS: Dict[str, Dict[str, Any]] = {  # ← 수정: 프리셋 추가
         "L_um": 0.1, "w_nm": 20.0,
         "prec": "TEMAHf  [Hf(NEtMe)₄]",
         "film": "HfO₂",
-        "T_C": 250.0, "P_mTorr": 100.0,
+        "T_C": 250.0, "P_Torr": 0.1,  # ← 수정: Torr 단위로 변경
         "desc": "FinFET gate-all-around HfO₂. 낮은 AR로 쉬운 코팅."
     },
-    "Flash WL Mo Fill": {  # ← 수정: 구조를 Infinite Trench로 변경, 치수 보정
+    "Flash WL Mo Fill": {
         "structure": "Infinite Trench",
         "L_um": 3.0, "w_nm": 20.0,
         "prec": "MoO₂Cl₂  [Mo metal]",
         "film": "Mo",
-        "T_C": 650.0, "P_mTorr": 80.0,
+        "T_C": 650.0, "P_Torr": 60,  # ← 수정: Torr 단위로 변경
         "desc": "3D NAND word line Mo fill (MoO₂Cl₂ + H₂). "
                "Replacement gate 공정에서 precursor는 수직 slit을 통해 진입 후 "
                "수평 lateral recess cavity를 채웁니다. "
@@ -613,15 +614,15 @@ def main() -> None:
             default_prec = preset["prec"]
             default_film = preset["film"]
             default_T = preset["T_C"]
-            default_P = preset["P_mTorr"]
+            default_P_Torr = preset["P_Torr"]  # ← 수정: Torr 기준
         else:
-            default_structure = "Cylindrical Hole"
-            default_L = 5.0
-            default_w = 100.0
+            default_structure = "Flash WL Mo Fill"
+            default_L = 20.0
+            default_w = 20.0
             default_prec = "MoO₂Cl₂  [Mo metal]"
-            default_film = "SiO₂"
+            default_film = "Mo"
             default_T = 650.0
-            default_P = 50.0
+            default_P_Torr = 60.0  # ← 수정: 60 Torr = 60000 mTorr
 
         st.header("Structure (Geometry)")
         structure = st.selectbox(
@@ -699,8 +700,30 @@ def main() -> None:
 
         st.header("Process Conditions")
         T_C = st.number_input("Temperature T (°C)", 50.0, 700.0, float(default_T), 5.0)
-        P_mTorr = st.number_input("Reference P (mTorr)", 0.01, 10000.0,
-                                   float(default_P), 1.0)
+
+        # ← 수정: 압력 단위 선택 (Torr/mTorr)
+        p_unit = st.radio(
+            "압력 단위", ["Torr", "mTorr"], index=0, horizontal=True,
+            help="실제 장비 게이지에서 읽는 단위에 맞춰 선택하세요. "
+                 "ALD 공정에서는 보통 Torr를 사용합니다. "
+                 "1 Torr = 1000 mTorr = 133.322 Pa."
+        )
+        if p_unit == "Torr":
+            P_user = st.number_input(
+                "Reference P (Torr)", 0.001, 100.0,
+                float(default_P_Torr), 0.01, format="%.3f",
+                help="Precursor 도징 중 챔버 내 partial pressure. "
+                     "Baratron 등 게이지 판독값 사용."
+            )
+            P_Torr = P_user  # 내부 변수: 항상 Torr
+        else:
+            P_user = st.number_input(
+                "Reference P (mTorr)", 0.01, 100000.0,
+                float(default_P_Torr * 1000), 1.0,
+                help="Precursor 도징 중 챔버 내 partial pressure. "
+                     "Baratron 등 게이지 판독값 사용."
+            )
+            P_Torr = P_user / 1000.0  # mTorr → Torr
 
         # ── 실제 노출량 모드 ─────────────────────────────────
         st.header("Actual Exposure Calculation")
@@ -714,10 +737,17 @@ def main() -> None:
         t_actual: Optional[float] = None
 
         if exp_mode == "일정 압력 P×t":
-            Pact_mT = st.number_input("노출 압력 (mTorr)", 0.01, 10000.0,
-                                       float(P_mTorr), 1.0)
+            if p_unit == "Torr":  # ← 수정: 동일한 단위 사용
+                Pact_user = st.number_input(
+                    "노출 압력 (Torr)", 0.001, 100.0,
+                    float(P_Torr), 0.01, format="%.3f")
+                Pact_Pa = Torr_to_Pa(Pact_user)
+            else:
+                Pact_user = st.number_input(
+                    "노출 압력 (mTorr)", 0.01, 100000.0,
+                    float(P_Torr * 1000), 1.0)
+                Pact_Pa = Torr_to_Pa(Pact_user / 1000.0)  # mTorr → Torr → Pa
             t_actual = st.number_input("펄스 시간 t (s)", 0.001, 3600.0, 1.0, 0.01)
-            Pact_Pa = Pact_mT * 0.133322
 
         elif exp_mode == "Fill Tank (ΔP 적분)":
             c1, c2 = st.columns(2)
@@ -772,7 +802,7 @@ def main() -> None:
     w_m = w_nm * 1e-9
     z_m = z_um * 1e-6 if z_um else None
     T_K = T_C + 273.15
-    P_Pa = P_mTorr * 0.133322
+    P_Pa = Torr_to_Pa(P_Torr)  # ← 수정: Torr → Pa 직접 변환
     m_kg = MW * 1e-3 / N_A
     d_m = d_A * 1e-10
     AR = L_m / w_m
@@ -851,8 +881,9 @@ def main() -> None:
     c1.metric("AR", f"{AR:.1f} : 1")
     c2.metric("EAR = a", f"{a:.2f} : 1")
     c3.metric("Required Exposure", f"{E_req_L:.1f} L", f"= {E_req:.2e} Pa·s")
+    P_display = f"{P_Torr:.3f} Torr" if p_unit == "Torr" else f"{P_Torr*1000:.0f} mTorr"
     c4.metric("Required Pulse", f"{t_pulse:.4f} s" if t_pulse < 100 else f"{t_pulse:.2f} s",
-              f"@ {P_mTorr:.0f} mTorr")
+              f"@ {P_display}")
     c5.metric("Knudsen Kn", f"{Kn:.2f}", f"λ={lam*1e9:.1f} nm")
     c6.metric(  # ← 수정: Dose Multiple 추가
         "Dose Multiple",
@@ -951,7 +982,7 @@ def main() -> None:
             c1, c2, c3, c4 = st.columns(4)
             c1.metric("ΔP × V_fill",
                       f"{Pa_to_Torr(ft_result.dP_Pa):.2f} Torr × {fill_inputs['V_fill_cc']:.0f} cc")
-            c2.metric("P_eq (chamber eq.)", f"{P_eq/133.322:.5f} Torr",
+            c2.metric("P_eq (chamber eq.)", f"{Pa_to_Torr(P_eq):.5f} Torr",
                       f"= {P_eq:.4f} Pa")
             c3.metric("τ = V_c / S_pump", f"{tau:.3f} s" if tau else "N/A")
             c4.metric("E_max = P_eq × τ",
@@ -1004,23 +1035,23 @@ def main() -> None:
                 )
                 mask_d = t_arr <= t_d
                 fig_ft.add_trace(go.Scatter(
-                    x=t_arr[mask_d], y=Pc_arr[mask_d]/133.322,
+                    x=t_arr[mask_d], y=Pa_to_Torr(Pc_arr[mask_d]),
                     name="P_c (during dose)",
                     line=dict(color="royalblue", width=2.5),
                     fill="tozeroy", fillcolor="rgba(30,100,255,0.10)"),
                     row=1, col=1)
                 fig_ft.add_trace(go.Scatter(
-                    x=t_arr[~mask_d], y=Pc_arr[~mask_d]/133.322,
+                    x=t_arr[~mask_d], y=Pa_to_Torr(Pc_arr[~mask_d]),
                     name="P_c (after dose)",
                     line=dict(color="royalblue", width=1.5, dash="dot"),
                     showlegend=False), row=1, col=1)
-                fig_ft.add_hline(y=P_eq/133.322, line_dash="dot", line_color="gray",
-                                 annotation_text=f"P_eq={P_eq/133.322:.4f}T",
+                fig_ft.add_hline(y=Pa_to_Torr(P_eq), line_dash="dot", line_color="gray",
+                                 annotation_text=f"P_eq={Pa_to_Torr(P_eq):.4f}T",
                                  row=1, col=1)
                 fig_ft.add_vline(x=t_d, line_dash="dash", line_color="black",
                                  row=1, col=1)
                 fig_ft.add_trace(go.Scatter(
-                    x=t_arr, y=Pf_arr/133.322, name="P_fill",
+                    x=t_arr, y=Pa_to_Torr(Pf_arr), name="P_fill",
                     line=dict(color="darkorange", width=2)), row=2, col=1)
                 fig_ft.add_vline(x=t_d, line_dash="dash", line_color="black",
                                  row=2, col=1)
@@ -1095,13 +1126,13 @@ def main() -> None:
                 E_req, "filltank", P_eq=P_eq_v, tau=tau_v
             ) if tau_v else None
             l_plot = calc_penetration_vec(E_cum, scale, w_m) * 1e6
-            Pc_Torr = P_c_plot / 133.322
+            Pc_Torr = Pa_to_Torr(P_c_plot)
         else:
             t_d = t_actual
             t_plot = np.linspace(0, t_d * 3, 600)
             E_cum = Pact_Pa * t_plot
             P_c_plot = np.full_like(t_plot, Pact_Pa)
-            Pc_Torr = P_c_plot / 133.322
+            Pc_Torr = Pa_to_Torr(P_c_plot)
             t_full = find_t_full(E_req, "constant", P_Pa=Pact_Pa)
             E_max_ft = None
             l_plot = calc_penetration_vec(E_cum, scale, w_m) * 1e6
@@ -1295,20 +1326,21 @@ def main() -> None:
             "장비의 base pressure에서 최소 도징 시간을 읽을 수 있습니다. "
             "주황 영역(Kn<1)에서는 Gordon 모델 부적합."
         )
-        P_arr = np.logspace(-2, 4, 400)
-        t_arr_p = [E_req / (p * 0.133322) for p in P_arr]
-        P_kn1 = k_B * T_K / (np.sqrt(2)*np.pi*d_m**2*w_m) / 0.133322
+        # 그래프 축: Torr 단위로 통일 ← 수정
+        P_arr_Torr = np.logspace(-4, 2, 400)  # 0.0001 ~ 100 Torr
+        t_arr_p = [E_req / Torr_to_Pa(p) for p in P_arr_Torr]
+        P_kn1_Torr = Pa_to_Torr(k_B * T_K / (np.sqrt(2)*np.pi*d_m**2*w_m))
         fig2 = go.Figure()
-        fig2.add_vrect(x0=P_kn1, x1=1e4, fillcolor="lightsalmon",
+        fig2.add_vrect(x0=P_kn1_Torr, x1=1e2, fillcolor="lightsalmon",
                        opacity=0.15, line_width=0, annotation_text="Kn<1")
-        fig2.add_trace(go.Scatter(x=P_arr, y=t_arr_p, mode="lines",
+        fig2.add_trace(go.Scatter(x=P_arr_Torr, y=t_arr_p, mode="lines",
                                   line=dict(color="forestgreen", width=3)))
-        fig2.add_vline(x=P_mTorr, line_dash="dash", line_color="red",
-                       annotation_text=f"  {P_mTorr:.1f}mTorr")
-        fig2.add_vline(x=P_kn1, line_dash="dot", line_color="salmon",
+        fig2.add_vline(x=P_Torr, line_dash="dash", line_color="red",
+                       annotation_text=f"  {P_Torr:.3f} Torr")
+        fig2.add_vline(x=P_kn1_Torr, line_dash="dot", line_color="salmon",
                        annotation_text="  Kn=1")
         fig2.update_layout(title="Pulse Time vs Pressure",
-                           xaxis_title="P (mTorr)", yaxis_title="Pulse Time (s)",
+                           xaxis_title="P (Torr)", yaxis_title="Pulse Time (s)",
                            xaxis_type="log", yaxis_type="log",
                            height=440, template="plotly_white")
         st.plotly_chart(fig2, use_container_width=True)
@@ -1435,14 +1467,14 @@ def main() -> None:
         ("L / w", f"{L_um:.2f} μm  /  {w_nm:.1f} nm"),
         ("Precursor / s₀", f"{prec_name}  |  s₀={s0:.2e}"),
         ("K_max", f"{K_max:.3e} molecules/m²"),
-        ("T / P (ref)", f"{T_C:.0f}°C  /  {P_mTorr:.1f} mTorr"),
+        ("T / P (ref)", f"{T_C:.0f}°C  /  {P_Torr:.3f} Torr"),
         ("λ / Kn / Flow", f"{lam*1e9:.1f} nm  /  {Kn:.2f}  /  {flow_tag}"),
         ("Growth mode", growth_tag),
         ("Required Exposure", f"{E_req_L:.2f} L  =  {E_req:.3e} Pa·s"),
         ("Flat Substrate Sat.", f"{E_flat_L:.2f} L  =  {E_flat:.3e} Pa·s"),
         ("Dose Multiple (HAR/flat)", f"{dose_multiple:.0f}×"),
         ("Required Pulse",
-         f"{t_pulse:.5f} s  @ {P_mTorr:.1f} mTorr"),
+         f"{t_pulse:.5f} s  @ {P_Torr:.3f} Torr"),
     ]
     if E_actual is not None and ratio is not None:
         lbl = "P×t" if exp_mode == "일정 압력 P×t" else "Fill Tank ODE"
@@ -1463,7 +1495,7 @@ def main() -> None:
         if ft_result is not None:
             rows_s += [
                 ("P_eq / τ",
-                 f"{ft_result.P_eq/133.322:.5f} Torr  /  "
+                 f"{ft_result.Pa_to_Torr(P_eq):.5f} Torr  /  "
                  f"{ft_result.tau:.3f} s" if ft_result.tau else "N/A"),
                 ("E_max",
                  f"{Pa_s_to_L(ft_result.E_max):.2f} L"
@@ -1480,3 +1512,4 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+    
