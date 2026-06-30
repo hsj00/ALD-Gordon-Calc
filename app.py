@@ -198,6 +198,7 @@ with st.sidebar:
 m = u.molar_mass_to_molecule_mass(M)
 K_max = u.areal_density_per_nm2_to_per_m2(K_max_nm2)
 a = phys.aspect_ratio(geom, L, w, z)
+is_hole = geom in ("circular_hole", "square_hole")
 ar_simple = phys.aspect_ratio_simple(L, w)
 flat_pa_s = phys.flat_saturation_exposure(K_max, m, T)
 Kn = phys.knudsen_number(phys.mean_free_path(T, P, d), w) if P > 0 else None
@@ -227,6 +228,8 @@ c1, c2, c3 = st.columns(3)
 c1.metric("AR = L/w (단면)", f"{ar_simple:.1f}")
 c2.metric("EAR (등가, 기하반영)", f"{a:.1f}")
 c3.metric("평탄면 포화 (Pt)_flat", fmt_exp(flat_pa_s))
+if geom == "square_pillar":
+    st.caption("⚠️ pillar EAR식 `L/(2√2·w)`는 MC 결과 — `w/w_pillar=3`, `L/w=5–50`에서만 유효(그 밖은 외삽).")
 
 if P > 0:
     msg = (f"Knudsen 수 Kn = λ/w = **{Kn:.3g}**  "
@@ -274,6 +277,8 @@ else:
     c3, c4 = st.columns(2)
     c3.metric("완전 피복 침투 깊이 l [Eq.24]", f"{u.from_m(l,'µm'):.2f} µm")
     c4.metric("→ 침투 깊이 기준 coated EAR", f"{coated_a:.1f}")
+    if not is_hole:
+        st.caption("⚠️ 침투 깊이(Eq.24, 4w/3)는 **원형 홀 기준 유도** — 트렌치·pillar에서는 근사입니다.")
     if spend_t is not None:
         st.metric(f"예산 소진 시간 (P={P_in:g} {pres_unit})", f"{spend_t:,.1f} s")
     if max_a == 0.0:
@@ -391,7 +396,8 @@ with tabs[1]:
     xb, yb = plots.curve_penetration_vs_dose(K_max, m, T, w, dose_max_L)
     dl_buttons(figB, ["Exposure_L", "Penetration_depth_um"], [xb, yb], "pendepth_vs_dose")
     plt.close(figB)
-    st.caption("Eq.(24): 주어진 노출량에서 완전 피복 깊이. 점선 = 목표 깊이 L.")
+    st.caption("Eq.(24): 주어진 노출량에서 완전 피복 깊이. 점선 = 목표 깊이 L."
+               + ("" if is_hole else "  ⚠️ 4w/3는 원형 홀 기준 — 트렌치/pillar에서는 근사."))
 
 with tabs[2]:
     if P > 0:
@@ -405,7 +411,8 @@ with tabs[2]:
         st.metric(f"목표 깊이 L={u.from_m(L,'µm'):.2f} µm 도달 feeding time (P={P_in:g} {pres_unit})",
                   f"{t_reach:,.1f} s")
         st.caption("Eq.(24)를 Pt=P·t 로 치환. l ∝ √t (깊이 2배 ≈ 시간 4배). "
-                   "⚠️ P 일정 가정 — 반응기 고갈·펄스 rise/fall 무시, 실측 시간은 더 클 수 있음.")
+                   "⚠️ P 일정 가정 — 반응기 고갈·펄스 rise/fall 무시, 실측 시간은 더 클 수 있음."
+                   + ("" if is_hole else " 침투 깊이 4w/3는 원형 홀 기준(트렌치/pillar 근사)."))
     else:
         st.warning("분압 P > 0 을 입력하면 feeding time 그래프가 표시됩니다.")
 

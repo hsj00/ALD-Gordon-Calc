@@ -16,6 +16,19 @@ depth** achievable with a given exposure budget.
 
 ---
 
+## Contents
+
+1. [Quick Start](#1-quick-start)
+2. [Gordon Model Equations — Meaning of Each Term](#2-gordon-model-equations--meaning-of-each-term)
+3. [Inputs — What to Enter, From Where, and On What Basis](#3-inputs--what-to-enter-from-where-and-on-what-basis)
+4. [Feature Overview](#4-feature-overview)
+5. [Mo ALD Notes](#5-mo-ald-notes-moo₂cl₂--mocl₅)
+6. [Validation & Limitations](#6-validation--limitations)
+7. [File Layout · Deployment](#7-file-layout--deployment)
+8. [Supplementary — Physical Origin of the Equations](#supplementary--physical-origin-of-the-equations-advanced)
+
+---
+
 ## 1. Quick Start
 
 ```bash
@@ -32,6 +45,8 @@ exposure of ≈ 9,600 L, reproducing the paper's HfO₂-hole case (~9,000 L).
 
 You only need to understand four equations. Focus on **what each term physically represents**, not on the arithmetic.
 
+> Equation numbers **Eq.(14)·Eq.(24) follow Cremers et al. (2019)** (the original model is Gordon 2003).
+
 ### 2.1 Equivalent Aspect Ratio (EAR)
 
 ```
@@ -43,9 +58,11 @@ a = L·p / (4A)        # general form (p: cross-section perimeter, A: cross-sect
 | circular/square hole | `a = L/w` | baseline |
 | trench | `a = L/(2w)` | **half** of a hole at the same L/w — easier to coat |
 | elongated hole | `a = L(w+z)/(2wz)` | between hole and trench |
-| square pillar | `a = L/(2√2·w)` | pillar array, easiest (~1/2.8) |
+| square pillar | `a = L/(2√2·w)` | pillar array, easiest (~1/2.8). ⚠️ **MC result** |
 
 `a` (= EAR) is the "equivalent aspect ratio normalized to a circular hole." **Deeper and narrower → larger a → harder to coat.**
+
+> ⚠️ The **square-pillar formula is a Monte Carlo result, not analytical**, valid only for `w/w_pillar = 3` and `L/w = 5–50` (otherwise extrapolation). See Supplementary S4.
 
 ### 2.2 Flat-Surface Saturation Exposure — the reference for everything
 
@@ -62,6 +79,9 @@ a = L·p / (4A)        # general form (p: cross-section perimeter, A: cross-sect
 > Exposure `Pt = partial pressure P × pulse time t`, so `(Pt)_flat` is the "pressure×time to coat a flat surface."
 > Higher T **increases** the required exposure because, at fixed partial pressure, higher temperature lowers
 > the gas density and thus the surface flux (`Φ ∝ P/√(mT)`).
+>
+> ⚠️ The model treats `K_max` as temperature-independent, but the real saturation density usually **decreases at
+> higher T**, partially offsetting the `(Pt)_flat ∝ √T` effect above (another reason to read results as order-of-magnitude).
 
 ### 2.3 Required Exposure for Conformal Coating — Eq.(14)
 
@@ -91,6 +111,10 @@ l = (4w/3) · ( √(1 + (3/8)·E*) − 1 ),     E* ≡ Pt / (Pt)_flat
 | `w` | feature width — since `l ∝ w`, narrower features penetrate less at the same exposure |
 
 > **Key intuition:** at high exposure `l ∝ √E*` → **doubling penetration depth needs 4× the exposure** (same √ relation as 2.3).
+>
+> ⚠️ **The `4w/3` coefficient in Eq.(24) is derived for circular holes.** The app applies the same formula (using width `w`)
+> to trenches and square pillars, so **penetration depth is an approximation for those geometries**. (The required exposure
+> from Eq.(14), being EAR-based, is geometry-general and unaffected.)
 
 ### 2.5 Molecular-Flow Check — Knudsen Number
 
@@ -173,7 +197,7 @@ Enter `K_max` in one of two ways:
 - **Four plots** (each with PNG + data-CSV download)
   - exposure vs EAR (Eq.14, log–log)
   - penetration depth vs exposure (Eq.24)
-  - penetration depth vs feeding (pulse) time — at fixed pressure, `l ∝ √t`
+  - penetration depth vs pulse time (feeding time) — at fixed pressure, `l ∝ √t`
   - geometry comparison (reproduces Fig.17: hole > trench > pillar at the same L/w)
 - **Multi-cycle EAR evolution** — wall growth narrows the feature each cycle, raising EAR (reproduces Gordon 36→43); penetration depth falls each cycle.
 - **Unit toggles** — temperature (°C/K), pressure (Pa/Torr/mTorr/mbar), length (nm/µm/mm), exposure (L/Pa·s/Torr·s).

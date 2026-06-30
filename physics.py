@@ -90,6 +90,10 @@ def penetration_depth(Pt, w, K_max, m, T):
 
     l = (4w/3) · ( sqrt(1 + 3/8·E*) − 1 ),   E* = Pt / (Pt)_flat
 
+    ⚠️ 계수 4/3 은 **원형 홀 기준 유도**임. 트렌치·square pillar 에 대해서도 동일 식
+       (폭 w 사용)을 적용하므로 그 기하에서는 침투 깊이가 근사임.
+       (EAR 기반인 required_exposure(Eq.14)는 기하 일반식이라 영향 없음.)
+
     ※ Eq.(14)와 완전한 역함수가 아님(저~중 AR에서 차이 ≈ 1 + 0.75a).
       따라서 '필요 노출량'은 required_exposure, '침투 깊이'는 본 함수로
       각각 산출하고, 어느 식을 썼는지 결과에 명시할 것.
