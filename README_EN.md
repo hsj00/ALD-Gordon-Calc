@@ -1,383 +1,330 @@
+# Gordon Model ALD Conformality Calculator
 
-# ALD Gordon Model Calculator v5 — User Manual
+A Streamlit app that estimates the **exposure (dose) and pulse time** needed to conformally coat
+high-aspect-ratio (HAR) features by ALD, and conversely the **maximum coatable EAR / penetration
+depth** achievable with a given exposure budget.
 
-> Gordon et al. *Chem. Vap. Deposition* 9, 73 (2003) · Cremers et al. *Appl. Phys. Rev.* 6, 021302 (2019)
+> **References**
+> - Review: V. Cremers, R. L. Puurunen, J. Dendooven, *"Conformality in atomic layer deposition,"* **Appl. Phys. Rev. 6, 021302 (2019).**
+> - Original model: R. G. Gordon, D. Hausmann, E. Kim, J. Shepard, *Chem. Vap. Depos.* **9(2), 73–78 (2003).**
 
----
-
-## Table of Contents
-
-1. [Introduction](https://claude.ai/chat/4e97662f-04e1-4206-806c-df6c605468a1#1-introduction)
-2. [Installation &amp; Launch](https://claude.ai/chat/4e97662f-04e1-4206-806c-df6c605468a1#2-installation--launch)
-3. [Core Physical Model](https://claude.ai/chat/4e97662f-04e1-4206-806c-df6c605468a1#3-core-physical-model)
-4. [Input Parameter Selection Guide](https://claude.ai/chat/4e97662f-04e1-4206-806c-df6c605468a1#4-input-parameter-selection-guide)
-5. [Practical Examples](https://claude.ai/chat/4e97662f-04e1-4206-806c-df6c605468a1#5-practical-examples)
-6. [Interpreting Results](https://claude.ai/chat/4e97662f-04e1-4206-806c-df6c605468a1#6-interpreting-results)
-7. [Using the Graph Tabs](https://claude.ai/chat/4e97662f-04e1-4206-806c-df6c605468a1#7-using-the-graph-tabs)
-8. [Fill Tank Model Details](https://claude.ai/chat/4e97662f-04e1-4206-806c-df6c605468a1#8-fill-tank-model-details)
-9. [Unit System &amp; Verification](https://claude.ai/chat/4e97662f-04e1-4206-806c-df6c605468a1#9-unit-system--verification)
-10. [Unit Tests](https://claude.ai/chat/4e97662f-04e1-4206-806c-df6c605468a1#10-unit-tests)
-11. [Limitations &amp; Caveats](https://claude.ai/chat/4e97662f-04e1-4206-806c-df6c605468a1#11-limitations--caveats)
-12. [References](https://claude.ai/chat/4e97662f-04e1-4206-806c-df6c605468a1#12-references)
+> ⚠️ **Scope and interpretation**
+> This tool is quantitatively meaningful only where **thermal ALD · molecular flow · diffusion-limited
+> (s=1) · irreversible reaction** hold. It does **not** apply to PE/ozone (recombination), viscous flow,
+> or strongly reaction-limited chemistry. **Treat absolute values as order-of-magnitude estimates.**
+> The largest uncertainty comes from the input `K_max`.
 
 ---
 
-## 1. Introduction
-
-This calculator predicts the  **minimum precursor exposure and dose time required for conformal ALD coating in high-aspect-ratio (HAR) structures** .
-
- **Key capabilities** :
-
-* Required exposure and pulse time via the Gordon model
-* Actual exposure from Fill Tank ODE integration
-* Time-resolved penetration depth tracking
-* Dose Multiple (HAR vs. flat substrate ratio)
-* Coverage profile θ(z) visualization
-* 5 presets (DRAM, 3D NAND, FinFET, Flash WL)
-* Pressure unit selection: Torr or mTorr
-
----
-
-## 2. Installation & Launch
+## 1. Quick Start
 
 ```bash
-pip install streamlit numpy pandas plotly scipy
-streamlit run ald_gordon_calculator_v5.py
+pip install -r requirements.txt
+streamlit run app.py
+```
+
+If it's your first time, just run the **defaults (HfO₂ hole, AR≈43)**. Forward mode returns a required
+exposure of ≈ 9,600 L, reproducing the paper's HfO₂-hole case (~9,000 L).
+
+---
+
+## 2. Gordon Model Equations — Meaning of Each Term
+
+You only need to understand four equations. Focus on **what each term physically represents**, not on the arithmetic.
+
+### 2.1 Equivalent Aspect Ratio (EAR)
+
+```
+a = L·p / (4A)        # general form (p: cross-section perimeter, A: cross-section area)
+```
+
+| Geometry | Reduction | Intuition |
+|---|---|---|
+| circular/square hole | `a = L/w` | baseline |
+| trench | `a = L/(2w)` | **half** of a hole at the same L/w — easier to coat |
+| elongated hole | `a = L(w+z)/(2wz)` | between hole and trench |
+| square pillar | `a = L/(2√2·w)` | pillar array, easiest (~1/2.8) |
+
+`a` (= EAR) is the "equivalent aspect ratio normalized to a circular hole." **Deeper and narrower → larger a → harder to coat.**
+
+### 2.2 Flat-Surface Saturation Exposure — the reference for everything
+
+```
+(Pt)_flat = K_max · √(2π · m · k_B · T)
+```
+
+| term | meaning | when larger |
+|---|---|---|
+| `(Pt)_flat` | minimum exposure to saturate one layer on a flat surface (AR=0) [Pa·s] | — |
+| `K_max` | saturated reactant density per unit area [/m²] | more molecules to deposit → exposure ↑ |
+| `√(2π·m·k_B·T)` | denominator of the Hertz–Knudsen flux `Φ = P/√(2πmk_BT)` | heavier molecule (m↑) / higher T → slower arrival at fixed pressure → exposure ↑ |
+
+> Exposure `Pt = partial pressure P × pulse time t`, so `(Pt)_flat` is the "pressure×time to coat a flat surface."
+> Higher T **increases** the required exposure because, at fixed partial pressure, higher temperature lowers
+> the gas density and thus the surface flux (`Φ ∝ P/√(mT)`).
+
+### 2.3 Required Exposure for Conformal Coating — Eq.(14)
+
+```
+Pt = (Pt)_flat · ( 1 + (19/4)·a + (3/2)·a² )
+```
+
+| term | value | physical meaning |
+|---|---|---|
+| `1` | 1 | flat-surface (entrance) contribution |
+| `(19/4)·a` | 4.75·a | first-order (linear) entrance/wall correction |
+| `(3/2)·a²` | 1.5·a² | **cost of transporting molecules deep into the feature** — dominates at high AR |
+
+> **Key intuition:** at high AR the `(3/2)a²` term dominates → **required exposure ∝ EAR²**.
+> Doubling EAR requires roughly **4×** the exposure.
+
+### 2.4 Penetration Depth for Sub-Saturating Exposure — Eq.(24)
+
+```
+l = (4w/3) · ( √(1 + (3/8)·E*) − 1 ),     E* ≡ Pt / (Pt)_flat
+```
+
+| term | meaning |
+|---|---|
+| `l` | depth **fully covered** by a given exposure `Pt` [m] |
+| `E*` | dimensionless exposure ratio = how many times the flat-saturation dose was applied |
+| `w` | feature width — since `l ∝ w`, narrower features penetrate less at the same exposure |
+
+> **Key intuition:** at high exposure `l ∝ √E*` → **doubling penetration depth needs 4× the exposure** (same √ relation as 2.3).
+
+### 2.5 Molecular-Flow Check — Knudsen Number
+
+```
+λ = k_B·T / (√2 · π · d² · P)        # mean free path (distance traveled between collisions)
+Kn = λ / w
+```
+
+| Kn | meaning |
+|---|---|
+| `Kn ≥ 10` | ✅ molecular flow — molecules collide only with walls → **Gordon model applies** |
+| `1 ≤ Kn < 10` | ⚠️ transition regime — reduced quantitative reliability |
+| `Kn < 1` | 🔴 viscous flow — gas–gas collisions → **Gordon (molecular flow) does not apply** |
+
+> The app computes this automatically and shows a colored badge.
+
+### 2.6 ⚠️ The Two Equations Are Not Exact Inverses
+
+"Required exposure" comes from **Eq.(14)** while "penetration depth" comes from **Eq.(24)**. Their correction
+terms differ slightly, giving a discrepancy of about `1 + 0.75a` at **low-to-moderate AR** (negligible at high AR
+where the a² term dominates). The app always labels which equation was used. (Math background in the Supplementary.)
+
+---
+
+## 3. Inputs — What to Enter, From Where, and On What Basis
+
+The sidebar is organized into **three groups by data source**. The same notes appear as tooltips (`?`) on each input.
+
+### ① Structure · from cross-section TEM / drawings
+
+| input | meaning | how to decide |
+|---|---|---|
+| geometry | sets the EAR reduction | choose from device structure / **cross-section TEM** shape |
+| depth L | feature depth/height | prefer **cross-section TEM·SEM measurement**, else drawing depth |
+| width/gap w | feature width/diameter (gap between pillars for pillar) | prefer **TEM·SEM measurement**, else drawing CD |
+| length z | long-axis length of an elongated hole | plan-view TEM / drawing |
+
+> Criterion: **prefer measured (TEM/SEM) over design values.** Post-etch CD/depth govern the actual EAR.
+
+### ② Process Conditions · from recipe / tool
+
+| input | meaning | how to decide |
+|---|---|---|
+| temperature T | the `√(2πm·k_BT)` flux term | **chuck (substrate) temperature per recipe step** (MoN seed / Mo bulk) |
+| partial pressure P | used for pulse time and the Knudsen check | **chamber pressure × precursor fraction** (MFC flow or ampoule vapor pressure). Uncertain for solid precursors |
+| exposure budget | (reverse mode) total exposure available | recipe pulse×pressure, or a target value |
+
+### ③ Precursor · Film — from your own measurements
+
+| input | meaning | how to decide |
+|---|---|---|
+| precursor preset | auto-fills molar mass M | choose your precursor (reference sticking s is also shown) |
+| molar mass M | the `√m` flux term | from chemical formula, auto-filled by preset |
+| **K_max** | saturated areal density (sets `(Pt)_flat`) | see box below — **the accuracy bottleneck** |
+| molecular diameter d | Knudsen check only | ~6–7 Å approximation, **usually leave as is** |
+| sticking s | (optional) reaction-limited bracket | entering s<1 adds an upper bound `×(1/s)`. Default 1 |
+
+#### 🔴 K_max — the input that governs accuracy
+
+Enter `K_max` in one of two ways:
+
+1. **Direct input** `[/nm²]` — simplest if known.
+2. **Estimate from measured GPC** (recommended) — `K_max ≈ GPC · ρ · N_A / M_film`
+
+| helper input | how to decide |
+|---|---|
+| measured GPC [nm/cycle] | **XRR thickness ÷ number of cycles** (your measurement) |
+| film density ρ [g/cm³] | **XRR measurement recommended**. Preset Mo-series defaults are lattice-based estimates |
+| film molar mass M_film [g/mol] | depends on film phase → **confirm phase by XRD** before choosing |
+
+> ⚠️ **GPC-based K_max is a simplified approximation** because "number of adsorption sites ≠ number of
+> deposited atoms" (e.g., for TMA/H₂O, reactive OH sites ~7–9/nm² vs. deposited Al ~4.5/nm² per cycle).
+> Interpret results at the **order-of-magnitude** level, and prefer your own measured GPC/density/phase.
+
+---
+
+## 4. Feature Overview
+
+- **Forward / reverse modes** — required exposure/pulse time ↔ coatable EAR/penetration depth from a budget. Partial pressure P is a shared input.
+- **Four plots** (each with PNG + data-CSV download)
+  - exposure vs EAR (Eq.14, log–log)
+  - penetration depth vs exposure (Eq.24)
+  - penetration depth vs feeding (pulse) time — at fixed pressure, `l ∝ √t`
+  - geometry comparison (reproduces Fig.17: hole > trench > pillar at the same L/w)
+- **Multi-cycle EAR evolution** — wall growth narrows the feature each cycle, raising EAR (reproduces Gordon 36→43); penetration depth falls each cycle.
+- **Unit toggles** — temperature (°C/K), pressure (Pa/Torr/mTorr/mbar), length (nm/µm/mm), exposure (L/Pa·s/Torr·s).
+- **Reliability badges** — Knudsen molecular-flow check, EAR<30 reaction-limited advisory.
+- **Reaction-limited bracket** — entering `s<1` in advanced settings shows a `Gordon (lower) ~ ×(1/s) (upper)` range (see below).
+- **Export** — results-summary CSV (Excel-friendly BOM) + plot PNG/CSV.
+
+### Meaning of the reaction-limited bracket (s<1)
+
+Because the Gordon equation assumes `s=1` (diffusion-limited), it can underestimate the required exposure
+for low-sticking processes. To make this visible, the app shows the rigorous bound as a range:
+
+```
+Pt(s=1)  ≤  actual Pt(s)  ≤  Pt(s=1) / s
+   (lower, Gordon)            (upper, reaction-limited)
+```
+
+- The upper bound is exact at a=0 (flat), while at **high AR the value converges to the lower bound** (the upper
+  bound becomes over-conservative) — hence the note "high AR → lower bound, low AR → upper bound."
+- For the exact s-dependence within the range, a Monte Carlo model is required (not yet implemented).
+
+---
+
+## 5. Mo ALD Notes (MoO₂Cl₂ / MoCl₅)
+
+- Example process: **MoN seed (MoO₂Cl₂ + NH₃ + H₂, 3-step) → Mo bulk (MoO₂Cl₂ + H₂, 2-step).**
+- With a **thermal H₂/NH₃** co-reactant the process is thermal/diffusion-limited, so **Gordon applies.**
+- However, interpret results as **upper-bound / order-of-magnitude** due to (also shown in the app's Mo popover):
+  1. **HCl by-product** occupying sites → reduced GPC deeper in the feature.
+  2. **CVD component** at high temperature (near decomposition).
+  3. If an **H₂/NH₃ step is rate-limiting** in the multi-step cycle, actual demand may differ.
+  4. **Vapor-pressure instability** of the solid precursor makes `P·t` ill-defined.
+- The calculation models the **MoO₂Cl₂ (metal reactant A)** exposure. Use your own **XRR/XRD** values for K_max
+  (preset Mo-series densities are lattice-based estimates).
+
+---
+
+## 6. Validation & Limitations
+
+Run `python validation.py` for self-checks against the paper's reference cases (all PASS).
+
+| Check | Computed | Paper/expected |
+|---|---|---|
+| flat (Pt)_flat (HfO₂, 200°C) | 3.23 L | 3–43 L |
+| hole EAR 36 / 43 required exposure | 6,840 / 9,620 L | ~9,000 L |
+| hole/trench exposure ratio (L/w=50) | 3.77× | →4 (high AR) |
+| forward↔inverse self-consistency | a=20 round-trip | — |
+| multi-cycle EAR (self-test) | 36 → 43 | Gordon 36→43 |
+
+**Limitations (stated honestly)**
+
+- **K_max uncertainty dominates accuracy** — the GPC-based estimate is a simplification.
+- **Risk of out-of-scope misuse** — PE/ozone (recombination), viscous flow, strong reaction limitation.
+- **s-dependence** — currently only a bracket (range). Exact regime behavior needs Monte Carlo (not implemented).
+- **Non-inverse equations** (§2.6) — the app always labels which equation was used.
+
+---
+
+## 7. File Layout · Deployment
+
+| file | role |
+|---|---|
+| `app.py` | Streamlit UI |
+| `physics.py` | Gordon-model pure functions (SI) |
+| `units.py` | unit conversions |
+| `plots.py` | curve data (`curve_*`) + matplotlib figures (`fig_*`) |
+| `export.py` | CSV/PNG export |
+| `presets.py` | precursor/film presets |
+| `multicycle.py` | multi-cycle EAR evolution |
+| `validation.py` | reference-case validation |
+
+**Deploy (Streamlit Community Cloud):** push to GitHub → at `share.streamlit.io` select the repo and `app.py` → Deploy.
+Subsequent pushes auto-redeploy.
+
+**Korean chart labels (optional):** chart axis labels are English for portability. For Korean, install a Nanum
+font and add to the top of `plots.py`:
+```python
+import matplotlib
+matplotlib.rcParams["font.family"] = "NanumGothic"   # or Malgun Gothic / AppleGothic
+matplotlib.rcParams["axes.unicode_minus"] = False
 ```
 
 ---
 
-## 3. Core Physical Model
+## Supplementary — Physical Origin of the Equations (advanced)
 
-### 3.1 Gordon Required Exposure (Eq. 14)
+> Not needed to use §2. Read only if you want to know "why 19/4·a and 3/2·a²."
+> For the exact derivation, see Gordon (2003) / Cremers (2019) §IV.
 
-```
-E_required = K_max × √(2π·m·k_B·T) × (1/19 + 4a/3 + 2a²)
-             ───────────────────────   ──────────────────────
-                    scale [Pa·s]           f(a) [dimensionless]
-```
+### S1. Where sticking hides in the flat-surface term
 
-Role of each term:
-
-* **K_max** [molecules/m²]: molecules consumed per m² of wall — "how hungry is the surface"
-* **√(2πmk_BT)** [kg·m/s]: momentum scale linking flux to exposure (P×t)
-* **f(a)** : geometric diffusion resistance — "how deep must we push"
-
-### 3.2 Equivalent Aspect Ratio (EAR)
-
-| Structure           | EAR Formula   | Example (L=5 μm, w=100 nm) |
-| ------------------- | ------------- | -------------------------- |
-| Cylindrical Hole    | a = L/w       | 50                         |
-| Infinite Trench     | a = L/(2w)    | 25                         |
-| Square Pillar Array | a = L/(2√2·w) | 17.7                       |
-
-A trench is open on both sides, so EAR = AR/2 — easier to coat than a hole at the same AR.
-
-### 3.3 K_max — Film Property vs. Precursor Property
-
-K_max is the  **maximum number of precursor molecules adsorbed per unit area per ALD half-cycle** .
+The Hertz–Knudsen flux is `Φ = P/√(2πmk_BT)`. The time to fill the sites is `t = K_max/(Φ·s)`, so **making the
+reaction probability s explicit**:
 
 ```
-K_max = GPC [m] × ρ_film [kg/m³] × N_A [/mol] / MW_film [g/mol]
+(Pt)_flat = K_max · √(2πmk_BT) / s
 ```
 
-Logic: "How many atoms fit in a GPC-thick film layer?" = "How many precursor molecules were consumed."
+The Gordon equation assumes `s=1`, dropping this `1/s`. The app's "reaction-limited bracket" restores this `1/s`
+as an upper bound. **But dividing all of Eq.(14) by `1/s` is wrong** — the `(3/2)a²` term that dominates at high AR
+is *transport (diffusion) limited* and is nearly s-independent (paper Fig.23). The s-dependence is regime-specific
+(*low AR = reaction-limited / high AR = s-independent*), so it cannot be inserted as a single factor.
 
-**Which property belongs to which?**
+### S2. Origin of the three terms in Eq.(14)
 
-| Parameter              | Property of             | Why                          |
-| ---------------------- | ----------------------- | ---------------------------- |
-| MW (molecular weight)  | **Precursor**           | Gas-phase diffusion speed    |
-| d (molecular diameter) | **Precursor**           | Knudsen number, MFP          |
-| s₀ (sticking coeff.)   | **Precursor + surface** | Surface reaction probability |
-| GPC                    | **Process measurement** | Growth per cycle             |
-| ρ_film, MW_film        | **Film**                | Used for K_max estimation    |
-
-Example: MoO₂Cl₂ depositing Mo metal
-
-* Precursor MW = 198.85 g/mol (MoO₂Cl₂) → diffusion calculation
-* Film ρ = 10.2 g/cm³, MW = 95.95 g/mol (Mo) → K_max calculation
-
-### 3.4 Penetration Depth (Eq. 24)
+The Gordon model treats the precursor as moving through the feature by **Knudsen diffusion**, reacting
+**irreversibly (s=1)** at the walls, and solves the depth-wise transport (conductance) together with wall
+consumption to obtain the required exposure:
 
 ```
-l(t) = (4w/3) × [√(1 + (3/8) × E(t)/scale) − 1]
+Pt / (Pt)_flat = 1 + (19/4)·a + (3/2)·a²
 ```
 
-* Early: l ∝ E (linear)
-* Late: l ∝ √E (diffusion-limited) — 4× exposure = 2× depth
+- `1` : one flat (entrance) layer.
+- `(19/4)·a` : first-order (linear) correction near the entrance/walls.
+- `(3/2)·a²` : cumulative transport cost with depth (second order); dominates at high AR → exposure ∝ a².
 
-### 3.5 Knudsen Number
+The `a²` dominance reflects the Knudsen-transport property that the cost of delivering molecules to the deepest
+point grows with the square of the depth.
 
-| Kn Range | Flow Regime                     | Gordon Model   |
-| -------- | ------------------------------- | -------------- |
-| Kn > 10  | Molecular — ping-pong off walls | Accurate       |
-| 0.1–10   | Transition — mixed collisions   | Approximate    |
-| Kn < 0.1 | Viscous — fluid behavior        | Not applicable |
+### S3. Why Eq.(14) and Eq.(24) are not exact inverses
+
+Inverting Eq.(24) with `l = L` for a circular hole (`a = L/w`) gives:
+
+```
+E* = 4·a + (3/2)·a²
+```
+
+whereas Eq.(14) gives:
+
+```
+E* = 1 + (19/4)·a + (3/2)·a²  =  1 + 4.75·a + 1.5·a²
+```
+
+→ the difference is `1 + 0.75·a` (an entrance/end-effect–level difference). It is negligible at high AR (a² dominates)
+but not at low-to-moderate AR. Hence "required exposure" uses Eq.(14) and "penetration depth" uses Eq.(24),
+with the chosen equation always labeled.
+
+### S4. Origin of the geometry EAR reductions
+
+The equivalent aspect ratio `a = L·p/(4A)` is defined by perimeter `p` and cross-section area `A`.
+Circular/square holes give `a = L/w`; a trench, blocked only on two sides, gives `a = L/(2w)`.
+The **square-pillar `a = L/(2√2·w)` is a Monte Carlo result**, not analytical, valid for `w/wpillar = 3` and `L/w = 5–50`.
+
+### S5. Multi-cycle EAR evolution
+
+Each cycle grows the walls by GPC, narrowing the width to `w_n = w₀ − 2·GPC·n`, so EAR `= L/w_n` increases.
+At a fixed per-cycle exposure the penetration depth `l ∝ w_n` decreases each cycle (consistent with Perez/Gordon).
+This is simply the Gordon model applied iteratively to a narrowing feature.
 
 ---
 
-## 4. Input Parameter Selection Guide
-
-### 4.1 Depth (L) and Width (w)
-
- **Measurement** : SEM/TEM cross-section, CD-SEM (use bottom CD)
-
-| Structure                  | Depth (L)        | Width (w)              | AR        |
-| -------------------------- | ---------------- | ---------------------- | --------- |
-| DRAM Capacitor (DDR4)      | 3–5 μm           | 60–100 nm              | 40–80:1   |
-| DRAM Capacitor (DDR5+)     | 5–8 μm           | 40–70 nm               | 80–150:1  |
-| 3D NAND 128L Channel Hole  | 8–9 μm           | 100–120 nm             | 70–90:1   |
-| 3D NAND 200L+ Channel Hole | 12–15 μm         | 90–110 nm              | 120–160:1 |
-| 3D NAND WL Lateral Cavity  | 2–4 μm (lateral) | 15–20 nm (gate height) | 100–200:1 |
-| FinFET Gate Trench         | 40–60 nm         | 7–20 nm                | 2–8:1     |
-
- **3D NAND Word Line note** : WL metal fill occurs through vertical slits into  **horizontal lateral recess cavities** . This is best modeled as an  **Infinite Trench** , not a cylindrical hole.
-
-* L = lateral distance from slit to channel hole (~2–4 μm)
-* w = WL gate height (~15–20 nm, roughly half of z-pitch ~40 nm)
-* Current z-pitch: ~40 nm; next-gen: 25–30 nm (gate length 10–15 nm)
-
-### 4.2 Sticking Coefficient (s₀)
-
-| Precursor       | Film         | s₀         | Source                 |
-| --------------- | ------------ | ---------- | ---------------------- |
-| TMA             | Al₂O₃        | ~0.01      | Cremers (2019)         |
-| TiCl₄           | TiO₂/TiN     | ~0.006     | Cremers (2019)         |
-| TEMAHf          | HfO₂         | ~0.1       | Gordon (2003)          |
-| DEZ             | ZnO          | ~0.007     | Gordon (2003)          |
-| BDEAS           | SiO₂ (PEALD) | ~3×10⁻⁵    | Literature estimate    |
-| MoCl₅ / MoO₂Cl₂ | Mo           | ~0.04–0.05 | Limited data — measure |
-
-### 4.3 Pressure (P)
-
-The calculator supports **Torr or mTorr** (selectable via sidebar radio button, default: Torr). Choose the unit that matches your equipment gauge.
-
-All internal calculations convert to Pa via `Torr_to_Pa()`. For mTorr input: mTorr → ÷1000 → Torr → `Torr_to_Pa()` → Pa.
-
-### 4.4 Fill Tank Parameters
-
-| Parameter       | How to Determine                                    | Typical Range      |
-| --------------- | --------------------------------------------------- | ------------------ |
-| V_fill (cc)     | Equipment manual + plumbing dead volume             | 10–200 cc          |
-| P_before (Torr) | Fill tank gauge after charging                      | 1–50 Torr          |
-| P_after (Torr)  | Fill tank gauge after release                       | 50–90% of P_before |
-| V_chamber (L)   | Equipment manual or N₂ purge measurement            | 1–50 L             |
-| S_pump (L/s)    | 50–80% of spec (effective S). Measure via dP/dt     | 50–500 L/s         |
-| C_valve (L/s)   | Skip if fast-fill. Enter if flow restrictor present | 10–100 L/s         |
-
----
-
-## 5. Practical Examples
-
-### Example 1: DRAM Capacitor HfO₂
-
-1. Select "DRAM Capacitor" preset → adjust to L=4.2 μm, w=75 nm
-2. Result: EAR=56, Required ~350 L, Pulse ~0.46 s @ 0.1 Torr
-3. Fill Tank: V_fill=50 cc, ΔP=5 Torr → saturation sufficient
-
-### Example 2: 3D NAND Channel Hole Al₂O₃
-
-1. Select "3D NAND Channel Hole" → L=8 μm, w=110 nm, TMA, 0.2 Torr
-2. EAR=72.7, Required ~1,200 L → challenging
-3. Optimize: P_before=20 Torr, V_fill=100 cc → saturation 110%
-
-### Example 3: Flash WL Mo Fill
-
-1. Select "Flash WL Mo Fill" → **Infinite Trench** (lateral recess)
-2. L=3 μm, w=20 nm, EAR=75:1
-3. Dose Multiple ~hundreds → multi-pulse strategy needed
-
----
-
-## 6. Interpreting Results
-
-### 6.1 Result Cards (6 metrics)
-
-| Card              | Meaning                                        |
-| ----------------- | ---------------------------------------------- |
-| AR                | Geometric aspect ratio                         |
-| EAR               | Equivalent aspect ratio (model input)          |
-| Required Exposure | Minimum exposure for 100% step coverage [L]    |
-| Required Pulse    | Minimum dose time at reference pressure [s]    |
-| Knudsen Kn        | Flow regime (> 10 = model reliable)            |
-| **Dose Multiple** | HAR required / flat substrate saturation ratio |
-
-### 6.2 Traffic Light Indicators
-
- **EAR** : 🟢 < 10 / 🟡 10–50 / 🔴 > 50
-
- **Required Exposure** : 🟢 < 100 L / 🟡 100–1,000 L / 🔴 > 1,000 L
-
- **Knudsen** : 🟢 > 10 / 🟡 0.1–10 / 🔴 < 0.1
-
-### 6.3 Dose Multiple — The "100–1000× vs. Flat Substrate" Explained
-
-```
-Dose Multiple = E_required(HAR) / E_flat(flat substrate)
-```
-
- **Literature basis** : Cremers (2019) — HfO₂ needed 3–43 L on flat substrate vs. 9,000 L in AR≈43 holes (200–3,000×).
-
- **Critical distinction** :
-
-| Ratio                | Definition            | What it means                                           |
-| -------------------- | --------------------- | ------------------------------------------------------- |
-| **Dose Multiple**    | E_req(HAR) / E_flat   | "N× harder than flat" →**already in Gordon Required**   |
-| **Saturation Ratio** | E_actual / E_req(HAR) | "Is supply sufficient?" →**≥100% = conformal achieved** |
-
-A Dose Multiple of 500× means "500× harder than flat" — do **not** multiply Required Exposure by 500 again.
-
-### 6.4 Saturation Ratio
-
-| Saturation | State                     | Action                          |
-| ---------- | ------------------------- | ------------------------------- |
-| ≥ 100%     | Conformal                 | Maintain conditions             |
-| 90–99%     | Slight thinning at bottom | Slightly increase dose time     |
-| 70–89%     | Significant bare area     | Increase time/pressure 1.2–1.5× |
-| < 50%      | No meaningful coating     | Fundamental redesign needed     |
-
-### 6.5 Fill Tank Model A vs. B
-
-| Model              | Definition               | Use                         |
-| ------------------ | ------------------------ | --------------------------- |
-| A: P_eq × t_dose   | Upper bound (constant P) | Optimistic                  |
-| B: ODE integration | Real pressure transient  | **Realistic (recommended)** |
-
----
-
-## 7. Using the Graph Tabs
-
-| Tab                      | Question Answered                                           |
-| ------------------------ | ----------------------------------------------------------- |
-| Exposure vs EAR          | How much more exposure if structure shrinks? (EAR² scaling) |
-| Pulse Time vs P          | What pressure for target dose time?                         |
-| Pulse Time vs T          | How does temperature affect dose time?                      |
-| EAR Structure Comparison | Hole vs. Trench coating difficulty at same AR?              |
-
----
-
-## 8. Fill Tank Model Details
-
-### Governing Equations
-
-```
-dP_f/dt = −C(P_f − P_c) / V_f
-dP_c/dt =  C(P_f − P_c) / V_c − S·P_c / V_c
-```
-
-### Key Parameters
-
-* **P_eq = ΔP × V_fill / V_chamber** — equilibrium chamber pressure
-* **τ = V_chamber / S_pump** — time constant
-* **E_max = P_eq × τ** — maximum achievable exposure
-
-### Decision Criteria
-
-| Condition          | Action                                     |
-| ------------------ | ------------------------------------------ |
-| E_max > E_required | Set t_dose ≥ t_full                        |
-| E_max < E_required | Increase ΔP, V_fill, or decrease S_pump    |
-| t_dose/τ < 0.5     | Extending dose time is effective           |
-| t_dose/τ > 3       | Diminishing returns; increase ΔP or V_fill |
-
----
-
-## 9. Unit System & Verification
-
-### 9.1 Pressure Unit Handling
-
-The calculator supports **Torr or mTorr** (sidebar radio button, default: Torr).
-
-Internal conversion path:
-
-```
-Torr mode:  user input [Torr]  → P_Torr          → Torr_to_Pa() → P_Pa [Pa]
-mTorr mode: user input [mTorr] → ÷1000 → P_Torr  → Torr_to_Pa() → P_Pa [Pa]
-```
-
-**All internal calculations use SI units (Pa).** No hardcoded conversion constants (`0.133322`, `/133.322`) exist in the codebase. All conversions go through `Torr_to_Pa()`, `Pa_to_Torr()`, and `Pa_s_to_L()` functions only.
-
-### 9.2 Full Unit Flow
-
-```
-Input Unit    SI Conversion          Calculation           Output Unit
-──────────   ──────────────────   ────────────────────   ─────────
-μm           → m  (×10⁻⁶)        gordon_a → a           [dimensionless]
-nm           → m  (×10⁻⁹)
-°C           → K  (+273.15)
-Torr/mTorr   → Pa (Torr_to_Pa)   E = scale × f(a)       Pa·s → L
-g/mol        → kg (×10⁻³/N_A)    t = E / P              s
-Å            → m  (×10⁻¹⁰)       λ = kBT/(..d²P)        m → nm
-nm, g/cm³    → K_max [1/m²]      Kn = λ/w               [dimensionless]
-cc           → m³ (×10⁻⁶)        Fill Tank ODE
-L            → m³ (×10⁻³)          P_c(t)                Pa → Torr
-L/s          → m³/s (×10⁻³)        E_cum(t)              Pa·s → L
-```
-
-### 9.3 Verification
-
-```bash
-python run_tests.py     # 44 automated verification tests
-```
-
-Verified items:
-
-* Physical constants (k_B, N_A) match CODATA 2018 exact values
-* Unit conversion round-trip (Torr↔Pa, Pa·s↔L)
-* K_max dimensional analysis: [m]×[g/m³]×[/mol]/[g/mol] = [molecules/m²]
-* Required Exposure: two independent calculation paths → exact match
-* Torr vs. mTorr input → identical results confirmed
-* Fill Tank ODE vs. analytical solution: relative error < 2%
-
----
-
-## 10. Unit Tests
-
-```bash
-python run_tests.py          # Standalone (no streamlit needed)
-pytest test_gordon_calculator.py -v   # With pytest
-```
-
-44 tests covering:
-
-* Unit conversion accuracy (3)
-* Gordon EAR calculation (4)
-* K_max estimation (1)
-* Mean free path (2)
-* Fill Tank ODE vs. analytical (22)
-* Penetration depth (3)
-* find_t_full (4)
-* Input validation (3)
-* Gordon exposure formula (2)
-
----
-
-## 11. Limitations & Caveats
-
-### Model Limitations
-
-1. **s₀ = 1 assumption** : Gordon model gives diffusion-limited result. For s₀ < 1, the actual profile is smoother — model provides a **conservative upper bound**
-2. **First-order Langmuir** : Only s(θ) = s₀(1−θ). Complex reaction mechanisms not included
-3. **Isothermal** : No temperature gradients inside the structure
-4. **Ideal gas** : Valid at low pressures (< few Torr)
-
-### Practical Caveats
-
-1. **Kn < 1** : Gordon model inaccurate. Use CFD simulations
-2. **K_max uncertainty** : GPC-based estimate has ±20–50% error. QCM measurement recommended for precision
-3. **Precursor decomposition** : CVD component possible at high T. Model assumes pure ALD
-4. **Surface chemistry variation** : If s₀ varies with depth (e.g., SiO₂ top vs. Si₃N₄ bottom), accuracy degrades
-
----
-
-## 12. References
-
-1. R. G. Gordon et al., "A Kinetic Model for Step Coverage by ALD in Narrow Holes or Trenches," *Chem. Vap. Deposition*  **9** , 73–78 (2003)
-2. V. Cremers et al., "Conformality in ALD: Current Status Overview of Analysis and Modelling," *Appl. Phys. Rev.*  **6** , 021302 (2019)
-3. H. C. M. Knoops et al., "Conformality of Plasma-Assisted ALD: Physical Processes and Modeling," *J. Electrochem. Soc.*  **157** , G241–G249 (2010)
-4. S. M. Sze, M. K. Lee,  *Semiconductor Devices: Physics and Technology* , 3rd Ed., Wiley (2012)
-
----
-
-*ALD Gordon Model Calculator v5 — 2025*
+*Gordon ALD Conformality Calculator · Model: Gordon et al. (2003) · Review: Cremers et al. (2019).
+Results depend on the model assumptions (s=1 · molecular flow · diffusion-limited); interpret absolute values at the order-of-magnitude level.*

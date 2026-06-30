@@ -1,405 +1,326 @@
+# Gordon 모델 ALD 컨포멀리티 계산기
 
-# ALD Gordon Model Calculator v5 — 사용자 매뉴얼
+고종횡비(HAR) 구조의 컨포멀 ALD 코팅에 필요한 **노출량(exposure)·펄스 시간**을 추정하고,
+역으로 **주어진 노출량으로 코팅 가능한 EAR·침투 깊이**를 계산하는 Streamlit 앱입니다.
 
-> Gordon et al. *Chem. Vap. Deposition* 9, 73 (2003) · Cremers et al. *Appl. Phys. Rev.* 6, 021302 (2019)
+> **근거 문헌**
+> - 리뷰: V. Cremers, R. L. Puurunen, J. Dendooven, *"Conformality in atomic layer deposition,"* **Appl. Phys. Rev. 6, 021302 (2019).**
+> - 원 모델: R. G. Gordon, D. Hausmann, E. Kim, J. Shepard, *Chem. Vap. Depos.* **9(2), 73–78 (2003).**
 
----
-
-## 목차
-
-1. [소개](https://claude.ai/chat/4e97662f-04e1-4206-806c-df6c605468a1#1-%EC%86%8C%EA%B0%9C)
-2. [설치 및 실행](https://claude.ai/chat/4e97662f-04e1-4206-806c-df6c605468a1#2-%EC%84%A4%EC%B9%98-%EB%B0%8F-%EC%8B%A4%ED%96%89)
-3. [핵심 물리 모델](https://claude.ai/chat/4e97662f-04e1-4206-806c-df6c605468a1#3-%ED%95%B5%EC%8B%AC-%EB%AC%BC%EB%A6%AC-%EB%AA%A8%EB%8D%B8)
-4. [입력 파라미터 선정 가이드](https://claude.ai/chat/4e97662f-04e1-4206-806c-df6c605468a1#4-%EC%9E%85%EB%A0%A5-%ED%8C%8C%EB%9D%BC%EB%AF%B8%ED%84%B0-%EC%84%A0%EC%A0%95-%EA%B0%80%EC%9D%B4%EB%93%9C)
-5. [실전 사용 예시](https://claude.ai/chat/4e97662f-04e1-4206-806c-df6c605468a1#5-%EC%8B%A4%EC%A0%84-%EC%82%AC%EC%9A%A9-%EC%98%88%EC%8B%9C)
-6. [결과 해석 방법](https://claude.ai/chat/4e97662f-04e1-4206-806c-df6c605468a1#6-%EA%B2%B0%EA%B3%BC-%ED%95%B4%EC%84%9D-%EB%B0%A9%EB%B2%95)
-7. [그래프 탭 활용법](https://claude.ai/chat/4e97662f-04e1-4206-806c-df6c605468a1#7-%EA%B7%B8%EB%9E%98%ED%94%84-%ED%83%AD-%ED%99%9C%EC%9A%A9%EB%B2%95)
-8. [Fill Tank 모델 상세](https://claude.ai/chat/4e97662f-04e1-4206-806c-df6c605468a1#8-fill-tank-%EB%AA%A8%EB%8D%B8-%EC%83%81%EC%84%B8)
-9. [단위 체계 및 검증](https://claude.ai/chat/4e97662f-04e1-4206-806c-df6c605468a1#9-%EB%8B%A8%EC%9C%84-%EC%B2%B4%EA%B3%84-%EB%B0%8F-%EA%B2%80%EC%A6%9D)
-10. [단위 테스트](https://claude.ai/chat/4e97662f-04e1-4206-806c-df6c605468a1#10-%EB%8B%A8%EC%9C%84-%ED%85%8C%EC%8A%A4%ED%8A%B8)
-11. [제한사항 및 주의사항](https://claude.ai/chat/4e97662f-04e1-4206-806c-df6c605468a1#11-%EC%A0%9C%ED%95%9C%EC%82%AC%ED%95%AD-%EB%B0%8F-%EC%A3%BC%EC%9D%98%EC%82%AC%ED%95%AD)
-12. [참고문헌](https://claude.ai/chat/4e97662f-04e1-4206-806c-df6c605468a1#12-%EC%B0%B8%EA%B3%A0%EB%AC%B8%ED%97%8C)
+> ⚠️ **적용 영역과 해석 주의**
+> 본 도구는 **열(thermal) ALD · 분자 흐름(molecular flow) · 확산 제한(s=1) · 비가역 반응**이
+> 성립하는 영역에서만 정량적으로 의미가 있습니다. PE/오존(재결합), 점성 흐름, 강한 반응 제한에는 부적용입니다.
+> **결과의 절대값은 "차수(order of magnitude)" 수준으로 해석**하세요. 최대 불확실성은 입력 `K_max`에서 나옵니다.
 
 ---
 
-## 1. 소개
-
-이 계산기는 **고종횡비(HAR) 구조에서 ALD precursor의 conformal 코팅에 필요한 최소 노출량과 도징 시간을 예측**하는 도구입니다.
-
- **주요 기능** :
-
-* Gordon 모델 기반 필요 노출량 및 도징 시간 계산
-* Fill Tank ODE 적분을 통한 실제 노출량 산출
-* 시간별 침투 깊이(penetration depth) 추적
-* 평탄 기판 대비 배수(Dose Multiple) 산출
-* 피복률(coverage) 프로파일 θ(z) 시각화
-* 5종 프리셋 (DRAM, 3D NAND, FinFET, Flash WL)
-* 압력 단위 Torr/mTorr 선택 가능
-
----
-
-## 2. 설치 및 실행
+## 1. 빠른 시작
 
 ```bash
-pip install streamlit numpy pandas plotly scipy
-streamlit run ald_gordon_calculator_v5.py
+pip install -r requirements.txt
+streamlit run app.py
+```
+
+처음이라면 **기본값(HfO₂ 홀, AR≈43)** 그대로 한 번 실행해 보세요. 정방향에서 필요 노출량 ≈ 9,600 L가
+나오는데, 이는 논문의 HfO₂ 홀 사례(~9,000 L)를 재현한 값입니다.
+
+---
+
+## 2. Gordon 모델 수식 — 각 term의 의미
+
+수식은 4개만 이해하면 됩니다. **무엇을 곱하고 더하는지**가 아니라 **각 항이 어떤 물리를 뜻하는지**에 집중하세요.
+
+### 2.1 등가 종횡비 (EAR)
+
+```
+a = L·p / (4A)        ← 기하 일반식 (p: 단면 둘레, A: 단면적)
+```
+
+| 구조 | 환산식 | 직관 |
+|---|---|---|
+| 원형/사각 홀 | `a = L/w` | 기준 |
+| 트렌치(trench) | `a = L/(2w)` | 같은 L/w라도 홀의 **½** — 양옆만 막혀 코팅 쉬움 |
+| elongated hole | `a = L(w+z)/(2wz)` | 홀과 트렌치 사이 |
+| square pillar | `a = L/(2√2·w)` | 기둥 배열, 가장 코팅 쉬움(~1/2.8) |
+
+`a`(=EAR)는 "원형 홀로 환산한 등가 종횡비"입니다. **구조가 깊고 좁을수록 a가 커지고 코팅이 어려워집니다.**
+
+### 2.2 평탄면 포화 노출량 — 모든 계산의 기준
+
+```
+(Pt)_flat = K_max · √(2π · m · k_B · T)
+```
+
+| term | 의미 | 커지면 |
+|---|---|---|
+| `(Pt)_flat` | 평탄면(AR=0) 한 겹을 포화시키는 **최소 노출량** [Pa·s] | — |
+| `K_max` | 포화 시 단위면적당 reactant 분자 수 [/m²] | 덮을 분자가 많음 → 노출량 ↑ |
+| `√(2π·m·k_B·T)` | Hertz–Knudsen 플럭스 `Φ = P/√(2πmk_BT)`의 분모 | 무거운 분자(m↑)·고온(T↑) → 같은 분압에서 표면 도달이 느림 → 노출량 ↑ |
+
+> 노출량 `Pt = 분압 P × 펄스 시간 t`. 즉 `(Pt)_flat`는 "평탄면을 덮는 데 필요한 압력×시간"입니다.
+> 고온일수록 노출량이 **커지는** 이유: 같은 분압에서 온도가 높으면 기체 밀도가 낮아져 단위시간당 표면 충돌(플럭스)이 줄기 때문(`Φ ∝ P/√(mT)`).
+
+### 2.3 컨포멀 코팅 필요 노출량 — Eq.(14)
+
+```
+Pt = (Pt)_flat · ( 1 + (19/4)·a + (3/2)·a² )
+```
+
+| 항 | 값 | 물리적 의미 |
+|---|---|---|
+| `1` | 1 | 평탄면(입구 표면) 기여 |
+| `(19/4)·a` | 4.75·a | 입구·벽 손실의 1차(선형) 보정 |
+| `(3/2)·a²` | 1.5·a² | **깊은 구조로 분자를 수송하는 비용(2차)** — 고AR에서 지배 |
+
+> **핵심 직관:** 고AR에서는 `(3/2)a²`가 지배 → **필요 노출량 ∝ EAR²**.
+> 즉 EAR이 2배가 되면 노출량은 약 **4배** 필요합니다.
+
+### 2.4 비포화 노출 시 침투 깊이 — Eq.(24)
+
+```
+l = (4w/3) · ( √(1 + (3/8)·E*) − 1 ),     E* ≡ Pt / (Pt)_flat
+```
+
+| term | 의미 |
+|---|---|
+| `l` | 주어진 노출량 `Pt`로 **완전히 덮이는 깊이** [m] |
+| `E*` | 무차원 노출비 = 평탄면 포화 대비 몇 배 노출했나 |
+| `w` | 피처 폭 — `l ∝ w`이므로 폭이 좁으면 같은 노출에서 얕게 침투 |
+
+> **핵심 직관:** 고노출에서 `l ∝ √E*` → **침투 깊이를 2배로 늘리려면 노출량은 4배** 필요(2.3의 a² 결과와 동일한 √ 관계).
+
+### 2.5 분자 흐름 점검 — Knudsen 수
+
+```
+λ = k_B·T / (√2 · π · d² · P)        ← 평균자유행로 (분자가 충돌 없이 가는 거리)
+Kn = λ / w
+```
+
+| Kn | 의미 |
+|---|---|
+| `Kn ≥ 10` | ✅ 분자 흐름 — 분자가 벽끼리만 충돌 → **Gordon 모델 적용 가능** |
+| `1 ≤ Kn < 10` | ⚠️ 전이 영역 — 정량 신뢰도 저하 |
+| `Kn < 1` | 🔴 점성 흐름 — 기체끼리 충돌 → **Gordon(분자 흐름) 부적용** |
+
+> 앱은 이 값을 자동 계산해 색상 배지로 표시합니다.
+
+### 2.6 ⚠️ 두 식은 완전한 역함수가 아님
+
+"필요 노출량"은 **Eq.(14)**, "침투 깊이"는 **Eq.(24)**에서 나오는데, 두 식의 보정 항이 약간 달라
+**저~중간 AR에서 ≈ `1 + 0.75a` 만큼 차이**가 날 수 있습니다(고AR에서는 a² 항이 지배해 거의 일치).
+앱은 어느 식을 썼는지 항상 표기합니다. (수학적 배경은 마지막 Supplementary 참조)
+
+---
+
+## 3. 입력값 — 무엇을, 어디서, 어떤 기준으로 정하나
+
+앱 사이드바는 **값의 출처별 3그룹**으로 구성되어 있습니다. 각 입력에 같은 내용이 툴팁(`?`)으로도 붙어 있습니다.
+
+### ① 구조 · 단면 TEM/도면에서
+
+| 입력 | 의미 | 정하는 기준·방법 |
+|---|---|---|
+| geometry | EAR 환산식 결정 | 소자 구조 / **단면 TEM 형상**으로 선택 |
+| 깊이 L | 피처 깊이/높이 | **단면 TEM·SEM 실측** 우선, 없으면 도면 depth |
+| 폭/갭 w | 피처 폭/직경 (pillar는 기둥 사이 갭) | **단면 TEM·SEM 실측** 우선, 없으면 도면 CD |
+| 홀 길이 z | elongated hole의 긴 방향 길이 | 평면 TEM / 도면 |
+
+> 기준: **도면 설계값보다 실측(TEM/SEM)을 우선**하세요. 식각 후 실제 CD·depth가 EAR을 좌우합니다.
+
+### ② 공정 조건 · 레시피/장비에서
+
+| 입력 | 의미 | 정하는 기준·방법 |
+|---|---|---|
+| 온도 T | flux의 `√(2πm·k_BT)` 항 | **레시피 스텝별 척(기판) 온도** (MoN seed / Mo bulk 각 스텝) |
+| 분압 P | 펄스 시간·Knudsen 점검에 사용 | **챔버 압력 × 전구체 비율**(MFC flow 또는 ampoule 증기압). 고체 전구체는 증기압이 일정치 않아 불확실 |
+| 노출량 예산 | (역방향) 쓸 수 있는 총 노출량 | 레시피의 펄스×분압, 또는 목표치 |
+
+### ③ 전구체·막 · 본인 측정값에서
+
+| 입력 | 의미 | 정하는 기준·방법 |
+|---|---|---|
+| 전구체 프리셋 | 선택 시 몰질량 M 자동 | 사용 전구체 선택 (참고 sticking s도 표시) |
+| 몰질량 M | flux의 `√m` 항 | 화학식 기반, 프리셋이 자동 채움 |
+| **K_max** | 포화 면밀도 (`(Pt)_flat` 결정) | 아래 박스 참조 — **정확도 최약점** |
+| 분자 지름 d | Knudsen 점검 전용 | ~6–7 Å 근사, **대개 그대로** 두면 됨 |
+| sticking s | (선택) 반응제한 브래킷용 | s<1 입력 시 상한 `×(1/s)` 함께 표시. 기본 1 |
+
+#### 🔴 K_max — 정확도를 좌우하는 가장 중요한 입력
+
+`K_max`는 두 방식으로 넣습니다.
+
+1. **직접 입력** `[/nm²]` — 알고 있다면 가장 간단.
+2. **측정 GPC로 추정** (권장) — `K_max ≈ GPC · ρ · N_A / M_film`
+
+| 보조 입력 | 정하는 기준 |
+|---|---|
+| 측정 GPC [nm/cycle] | **XRR 두께 ÷ 사이클 수** (본인 측정) |
+| 막 밀도 ρ [g/cm³] | **XRR 측정 권장**. 프리셋 Mo계 기본값은 격자 기반 추정 |
+| 막 몰질량 M_film [g/mol] | 막 상(phase)에 따라 다름 → **XRD로 상 확인** 후 선택 |
+
+> ⚠️ **GPC 기반 K_max는 단순화 근사입니다.** "흡착 사이트 수 ≠ 증착 원자 수"이기 때문입니다
+> (예: TMA/H₂O에서 반응성 OH 사이트 ~7–9/nm² vs 사이클당 증착 Al ~4.5/nm²).
+> 따라서 결과는 **차수 수준**으로 해석하고, 가능하면 본인의 측정 GPC·밀도·상을 쓰세요.
+
+---
+
+## 4. 기능 개요
+
+- **정/역방향 모드** — 필요 노출량/펄스시간 ↔ 노출량 예산으로 코팅 가능한 EAR/침투깊이. 분압 P는 공통 입력.
+- **그래프 4종** (각각 PNG·데이터 CSV 다운로드)
+  - 노출량 vs EAR (Eq.14, log–log)
+  - 침투깊이 vs 노출량 (Eq.24)
+  - 침투깊이 vs feeding(펄스) 시간 — 고정 분압에서 `l ∝ √t`
+  - 기하 비교 (Fig.17 재현: 같은 L/w에서 hole > trench > pillar)
+- **다중 사이클 EAR 변화** — 매 사이클 벽 성장으로 폭이 줄고 EAR이 증가(Gordon 36→43 재현). 침투깊이는 사이클마다 감소.
+- **단위 토글** — 온도(°C/K)·압력(Pa/Torr/mTorr/mbar)·길이(nm/µm/mm)·노출량(L/Pa·s/Torr·s).
+- **신뢰도 배지** — Knudsen 분자흐름 점검, EAR<30 반응제한 주의.
+- **반응제한 브래킷** — 고급 설정에서 `s<1` 입력 시 `Gordon(하한) ~ ×(1/s)(상한)` 범위 표시(아래 §5 참조).
+- **export** — 결과 요약 CSV(Excel 한글 BOM) + 그래프 PNG/CSV.
+
+### 반응제한 브래킷(s<1)의 의미
+
+Gordon 식은 `s=1`(확산 제한)을 가정하므로 sticking이 작은 공정에서는 필요 노출량을 과소평가할 수 있습니다.
+이를 보이기 위해 다음 부등식을 범위로 표시합니다.
+
+```
+Pt(s=1)  ≤  실제 Pt(s)  ≤  Pt(s=1) / s
+   (하한, Gordon)            (상한, 반응제한)
+```
+
+- a=0(평탄면)에서는 상한이 정확, **고AR(확산 제한)에서는 하한에 수렴**(상한은 과대) — 그래서 경고문에 "고AR은 하한, 저AR은 상한에 근접"을 명시합니다.
+- 영역별 정확한 s 거동이 필요하면 Monte Carlo 모델이 필요합니다(현재 미구현).
+
+---
+
+## 5. Mo ALD 사용 노트 (MoO₂Cl₂ / MoCl₅)
+
+- 공정 예: **MoN seed (MoO₂Cl₂ + NH₃ + H₂, 3-step) → Mo bulk (MoO₂Cl₂ + H₂, 2-step)**.
+- co-reactant가 **thermal H₂/NH₃**이면 열·확산 제한 영역이므로 **Gordon 적용 가능**합니다.
+- 단, 다음 한계 때문에 결과는 **상한·차수**로 해석하세요(앱의 Mo 팝오버에도 안내):
+  1. **HCl 부산물**이 사이트를 점유 → 깊은 곳 GPC 저하.
+  2. 고온(분해 근처)에서 **CVD 성분**.
+  3. 다단계에서 **H₂·NH₃ 단계가 율속**이면 실제 요구 노출이 달라질 수 있음.
+  4. 고체 전구체 **증기압 불안정**으로 `P·t` 정의가 불확실.
+- 본 계산은 **MoO₂Cl₂(금속 reactant A)** 노출 기준입니다. K_max는 본인 **XRR/XRD** 측정값을 쓰세요
+  (프리셋의 Mo계 밀도는 격자 기반 추정값).
+
+---
+
+## 6. 검증 & 한계
+
+`python validation.py`로 논문 레퍼런스 대조 자가검증을 실행할 수 있습니다(전부 PASS).
+
+| 검증 항목 | 계산값 | 논문/기대 |
+|---|---|---|
+| 평탄면 (Pt)_flat (HfO₂, 200°C) | 3.23 L | 3–43 L |
+| 홀 EAR 36 / 43 필요 노출 | 6,840 / 9,620 L | ~9,000 L |
+| 홀/트렌치 노출비 (L/w=50) | 3.77× | →4 (고AR) |
+| 정방향↔역산 자기일관성 | a=20 왕복 일치 | — |
+| 다중사이클 EAR (자가검증) | 36 → 43 | Gordon 36→43 |
+
+**한계(정직한 명시)**
+
+- **K_max 불확실성이 정확도를 지배** — GPC 기반은 단순화 근사.
+- **적용 영역 밖 오용 주의** — PE/오존(재결합), 점성 흐름, 강한 반응 제한.
+- **s 의존성** — 현재는 브래킷(범위) 표시까지만. 영역별 정확한 거동은 Monte Carlo 필요(미구현).
+- **두 식의 비역함수성**(§2.6) — 어느 식을 썼는지 항상 표기.
+
+---
+
+## 7. 파일 구성 · 배포
+
+| 파일 | 역할 |
+|---|---|
+| `app.py` | Streamlit UI |
+| `physics.py` | Gordon 모델 순수 함수 (SI) |
+| `units.py` | 단위 변환 |
+| `plots.py` | 곡선 데이터(`curve_*`) + matplotlib 그래프(`fig_*`) |
+| `export.py` | CSV/PNG 내보내기 |
+| `presets.py` | 전구체·막 프리셋 |
+| `multicycle.py` | 다중 사이클 EAR 변화 |
+| `validation.py` | 논문 레퍼런스 대조 검증 |
+
+**배포(Streamlit Community Cloud):** GitHub에 push → `share.streamlit.io`에서 저장소·`app.py` 지정 → Deploy.
+이후 push 시 자동 재배포.
+
+**그래프 축 한글화(선택):** 호환성을 위해 차트 라벨은 영문입니다. 한글을 원하면 Nanum 폰트 설치 후
+`plots.py` 상단에 추가:
+```python
+import matplotlib
+matplotlib.rcParams["font.family"] = "NanumGothic"   # 또는 Malgun Gothic / AppleGothic
+matplotlib.rcParams["axes.unicode_minus"] = False
 ```
 
 ---
 
-## 3. 핵심 물리 모델
+## Supplementary — 수식의 물리적 기원 (심화)
 
-### 3.1 Gordon 필요 노출량 (Eq.14)
+> 본문(§2)을 이해하는 데는 필요 없습니다. "왜 19/4·a, 3/2·a²인가"가 궁금한 경우만 읽으세요.
+> 정확한 계수 유도는 Gordon (2003) 원논문 / Cremers (2019) §IV를 참조하세요.
 
-구조 바닥까지 완전한 conformal 코팅에 필요한 최소 precursor 노출량:
+### S1. 평탄면 항에 sticking이 숨어 있는 곳
 
-```
-E_required = K_max × √(2π·m·k_B·T) × (1/19 + 4a/3 + 2a²)
-             ───────────────────────   ──────────────────────
-                    scale [Pa·s]           f(a) [무차원]
-```
-
-각 항의 역할:
-
-* **K_max** [molecules/m²]: 벽면 1 m²를 포화시키는 데 필요한 분자 수 — "벽면이 얼마나 많이 소비하는가"
-* **√(2πmk_BT)** [kg·m/s]: 분자의 운동량 스케일. 분자 충돌률(flux)을 노출량(P·t)으로 변환하는 계수
-* **f(a)** : 구조의 기하학적 확산 저항 — "얼마나 깊이 밀어넣어야 하는가"
-
-### 3.2 일반화 종횡비 (EAR)
-
-| 구조                | EAR 공식      | 예시 (L=5μm, w=100nm) |
-| ------------------- | ------------- | --------------------- |
-| Cylindrical Hole    | a = L/w       | 50                    |
-| Infinite Trench     | a = L/(2w)    | 25                    |
-| Square Pillar Array | a = L/(2√2·w) | 17.7                  |
-
-같은 AR이라도 Trench는 양면이 열려있으므로 EAR = AR/2. Hole보다 코팅이 쉽습니다.
-
-### 3.3 K_max — Film property와 Precursor property의 구분
-
-K_max는 **"한 ALD half-cycle에서 표면 단위 면적당 흡착되는 precursor 분자의 최대 개수"**입니다.
-
-계산 공식:
+Hertz–Knudsen 플럭스는 `Φ = P/√(2πmk_BT)`입니다. 사이트를 채우는 데 필요한 시간은
+`t = K_max/(Φ·s)`이므로 **반응 확률 s를 명시하면**:
 
 ```
-K_max = GPC [m] × ρ_film [kg/m³] × N_A [/mol] / MW_film [g/mol]
+(Pt)_flat = K_max · √(2πmk_BT) / s
 ```
 
-이 공식의 논리: "GPC 두께의 film 안에 원자가 몇 개인가?" = "한 cycle에 소비된 precursor 분자 수"
+Gordon 식은 `s=1`을 가정해 이 `1/s`를 떨어뜨린 형태입니다. 그래서 앱의 "반응제한 브래킷"은
+이 `1/s`를 상한으로 되살린 것입니다. **단, Eq.(14) 전체를 `1/s`로 나누면 틀립니다** — 고AR을
+지배하는 `(3/2)a²` 항은 *수송(확산) 제한*이라 s에 거의 무관하기 때문입니다(논문 Fig.23).
+즉 s 의존성은 *저AR=반응제한 / 고AR=s무관*으로 영역마다 달라, 단일 계수로 넣을 수 없습니다.
 
- **Film property vs Precursor property 사용처** :
+### S2. Eq.(14)의 세 항의 기원
 
-| 파라미터            | 무엇의 성질?         | 이유                       |
-| ------------------- | -------------------- | -------------------------- |
-| MW (분자량)         | **Precursor**        | 기체상 확산 속도 결정      |
-| d (분자 직경)       | **Precursor**        | Knudsen 수, 평균 자유 경로 |
-| s₀ (sticking coeff) | **Precursor + 표면** | 표면 반응 확률             |
-| GPC                 | **공정 측정값**      | 한 cycle의 성장 두께       |
-| ρ_film, MW_film     | **Film**             | K_max 추정에 사용          |
-
-예: MoO₂Cl₂로 Mo metal 증착 시
-
-* Precursor MW = 198.85 g/mol (MoO₂Cl₂) → 확산 속도 계산에 사용
-* Film ρ = 10.2 g/cm³, MW = 95.95 g/mol (Mo) → K_max 계산에 사용
-
-### 3.4 침투 깊이 (Eq.24)
+Gordon 모델은 전구체가 피처 내부를 **Knudsen 확산**으로 이동하며 벽에서 **비가역 반응(s=1)**
+한다고 보고, 깊이 방향의 분자 수송(컨덕턴스)과 벽 소모를 함께 풀어 필요 노출량을 얻습니다.
 
 ```
-l(t) = (4w/3) × [√(1 + (3/8) × E(t)/scale) − 1]
+Pt / (Pt)_flat = 1 + (19/4)·a + (3/2)·a²
 ```
 
-* 초기: l ∝ E (선형)
-* 후기: l ∝ √E (확산 지배) — 노출량 4배 → 침투 깊이 2배
+- `1` : 평탄면(입구) 한 겹.
+- `(19/4)·a` : 입구·벽 부근의 1차(선형) 보정.
+- `(3/2)·a²` : 깊이에 따른 누적 수송 비용(2차). 고AR에서 지배 → 노출량 ∝ a².
 
-### 3.5 Knudsen 수
+`a²` 지배는 "구멍이 깊어질수록, 깊은 곳까지 분자를 보내는 비용이 깊이의 제곱으로 증가"하는
+Knudsen 수송의 특성에서 나옵니다.
 
-| Kn 범위  | 유동 영역                                    | Gordon 모델 |
-| -------- | -------------------------------------------- | ----------- |
-| Kn > 10  | Molecular Flow — 분자가 벽에 탁구공처럼 튕김 | 정확        |
-| 0.1~10   | Transition — 벽-분자, 분자-분자 충돌 공존    | 근사 적용   |
-| Kn < 0.1 | Viscous Flow — 유체 거동                     | 부적합      |
+### S3. Eq.(14)와 Eq.(24)가 완전 역함수가 아닌 이유
+
+Eq.(24)에 `l = L`, 원형 홀(`a = L/w`)을 대입해 역산하면:
+
+```
+E* = 4·a + (3/2)·a²
+```
+
+반면 Eq.(14)는:
+
+```
+E* = 1 + (19/4)·a + (3/2)·a²  =  1 + 4.75·a + 1.5·a²
+```
+
+→ 두 식의 차이는 `1 + 0.75·a` (입구/끝단 보정 수준의 차이). 고AR에서는 `a²` 항이 지배해
+무시되지만 저~중간 AR에서는 무시할 수 없습니다. 그래서 "필요 노출량"은 Eq.(14)로,
+"침투 깊이"는 Eq.(24)로 각각 산출하고 어느 식을 썼는지 항상 표기합니다.
+
+### S4. 기하별 EAR 환산의 기원
+
+등가 종횡비 `a = L·p/(4A)`는 단면 둘레 `p`와 단면적 `A`로 정의됩니다.
+원형/사각 홀은 `a = L/w`, 트렌치는 양옆만 막혀 `a = L/(2w)`가 됩니다.
+**square pillar의 `a = L/(2√2·w)`는 해석식이 아니라 Monte Carlo 결과**이며,
+`w/wpillar = 3`, `L/w = 5–50` 범위에서 유효합니다.
+
+### S5. 다중 사이클 EAR 변화
+
+매 사이클 벽이 GPC만큼 자라 폭이 `w_n = w₀ − 2·GPC·n`로 줄고, EAR `= L/w_n`이 증가합니다.
+고정 per-cycle 노출에서 침투 깊이는 `l ∝ w_n`이므로 사이클마다 감소합니다(Perez/Gordon과 일치).
+이는 Gordon 모델을 "좁아지는 피처"에 반복 적용한 것입니다.
 
 ---
 
-## 4. 입력 파라미터 선정 가이드
-
-### 4.1 Depth (L)과 Width (w)
-
- **측정 방법** : SEM/TEM 단면 분석, CD-SEM (bottom CD 사용 권장)
-
-| 구조                       | Depth (L)        | Width (w)              | AR        |
-| -------------------------- | ---------------- | ---------------------- | --------- |
-| DRAM Capacitor (DDR4)      | 3~5 μm           | 60~100 nm              | 40~80:1   |
-| DRAM Capacitor (DDR5+)     | 5~8 μm           | 40~70 nm               | 80~150:1  |
-| 3D NAND 128L Channel Hole  | 8~9 μm           | 100~120 nm             | 70~90:1   |
-| 3D NAND 200L+ Channel Hole | 12~15 μm         | 90~110 nm              | 120~160:1 |
-| 3D NAND WL Lateral Cavity  | 2~4 μm (lateral) | 15~20 nm (gate height) | 100~200:1 |
-| FinFET Gate Trench         | 40~60 nm         | 7~20 nm                | 2~8:1     |
-
- **3D NAND Word Line 구조 참고** : WL 금속 충전은 수직 slit을 통해 precursor가 진입한 후 **수평 방향의 lateral recess cavity**를 채우는 구조입니다. Cylindrical Hole이 아닌 **Infinite Trench**에 가깝습니다.
-
-* L = slit에서 channel hole까지의 수평 거리 (~2~4 μm)
-* w = WL gate height (~15~20 nm, z-pitch ~40 nm의 약 절반)
-* 현재 z-pitch: ~40 nm, 차세대: 25~30 nm (gate length 10~15 nm)
-
-### 4.2 Sticking Coefficient (s₀)
-
- **측정 방법** : Lateral HARS 테스트 구조 + TEM 분석, QCM, Monte Carlo 피팅
-
-| Precursor | Film         | s₀      | 출처                   |
-| --------- | ------------ | ------- | ---------------------- |
-| TMA       | Al₂O₃        | ~0.01   | Cremers (2019)         |
-| TiCl₄     | TiO₂/TiN     | ~0.006  | Cremers (2019)         |
-| TEMAHf    | HfO₂         | ~0.1    | Gordon (2003)          |
-| DEZ       | ZnO          | ~0.007  | Gordon (2003)          |
-| BDEAS     | SiO₂ (PEALD) | ~3×10⁻⁵ | 문헌 추정              |
-| MoCl₅     | Mo           | ~0.05   | 문헌 제한적, 실측 필요 |
-| MoO₂Cl₂   | Mo           | ~0.04   | 문헌 제한적, 실측 필요 |
-
-### 4.3 GPC
-
-평탄 기판 위 **포화 조건**에서 Ellipsometry 또는 XRR로 측정한 값을 사용합니다.
-
-### 4.4 K_max
-
-자동 추정: `K_max = GPC × ρ_film × N_A / MW_film`. 오차 ±20~50%. 정밀값은 in-situ QCM 측정 권장.
-
-### 4.5 압력 (P)
-
-계산기에서 **Torr 또는 mTorr 중 선택 가능**합니다. 기본값은 Torr입니다. 장비 게이지 단위에 맞춰 선택하세요.
-
-모든 내부 계산은 `Torr_to_Pa()` 함수를 통해 Pa로 변환 후 SI 단위로 수행됩니다. mTorr 입력 시에도 mTorr → Torr → Pa 순서로 함수를 통해 변환됩니다.
-
-### 4.6 Fill Tank 파라미터
-
-| 파라미터        | 결정 방법                                       | 일반 범위         |
-| --------------- | ----------------------------------------------- | ----------------- |
-| V_fill (cc)     | 장비 매뉴얼 'canister volume' + 배관 사체적     | 10~200 cc         |
-| P_before (Torr) | Fill tank 게이지 판독 (충전 후)                 | 1~50 Torr         |
-| P_after (Torr)  | Fill tank 게이지 판독 (방출 후)                 | P_before의 50~90% |
-| V_chamber (L)   | 장비 매뉴얼 또는 N₂ purge로 실측                | 1~50 L            |
-| S_pump (L/s)    | Spec의 50~80% (유효 S). dP/dt 실측 권장         | 50~500 L/s        |
-| C_valve (L/s)   | Fast-fill이면 생략. Flow restrictor 있으면 입력 | 10~100 L/s        |
-
----
-
-## 5. 실전 사용 예시
-
-### 예시 1: DRAM 커패시터 HfO₂
-
-1. 프리셋 "DRAM Capacitor" 선택
-2. TEM 결과에 맞춰 L=4.2μm, w=75nm으로 수정
-3. 결과: EAR=56, Required ~350 L, Pulse ~0.46s @ 0.1 Torr
-4. Fill Tank 확인: V_fill=50cc, ΔP=5T → E_actual=2500 L → 포화도 충분
-
-### 예시 2: 3D NAND Channel Hole Al₂O₃
-
-1. 프리셋 "3D NAND Channel Hole" 선택
-2. L=8μm, w=110nm, TMA, 0.2 Torr
-3. EAR=72.7, Required ~1,200 L → 도전적
-4. Fill Tank 최적화: P_before=20T, V_fill=100cc → 포화도 110%
-
-### 예시 3: Flash WL Mo Fill
-
-1. 프리셋 "Flash WL Mo Fill" 선택
-2. 구조: **Infinite Trench** (lateral recess cavity)
-3. L=3μm (slit→hole lateral 거리), w=20nm (gate height)
-4. EAR=75:1, Dose Multiple ~수백 배 → multi-pulse 전략 검토
-
----
-
-## 6. 결과 해석 방법
-
-### 6.1 결과 카드 (6개)
-
-| 카드              | 의미                                              |
-| ----------------- | ------------------------------------------------- |
-| AR                | 기하학적 종횡비                                   |
-| EAR               | 일반화 종횡비 (모델 입력)                         |
-| Required Exposure | 100% step coverage에 필요한 최소 노출량 [L]       |
-| Required Pulse    | 기준 압력에서의 최소 도징 시간 [s]                |
-| Knudsen Kn        | 유동 영역 판정 (>10이면 모델 신뢰)                |
-| **Dose Multiple** | 평탄 기판 포화 노출량 대비 HAR 필요 노출량의 배수 |
-
-### 6.2 신호등 색상 해석
-
- **EAR** : 🟢 < 10 (쉬움) / 🟡 10~50 (DRAM급) / 🔴 > 50 (3D NAND급)
-
- **필요 노출량** : 🟢 < 100 L / 🟡 100~1,000 L / 🔴 > 1,000 L
-
- **Knudsen** : 🟢 Kn > 10 (molecular) / 🟡 0.1~10 (transition) / 🔴 < 0.1 (viscous)
-
-### 6.3 Dose Multiple — "평탄 기판 대비 100~1000배"의 정체
-
-ALD에서 "평탄 대비 수백 배 노출이 필요하다"는 표현이 자주 등장합니다. 이 계산기의 **Dose Multiple**이 바로 이 비율입니다.
-
-```
-Dose Multiple = E_required(HAR) / E_flat(평탄 기판)
-```
-
- **문헌 근거** : Cremers (2019)에 따르면, HfO₂ ALD에서 평탄 기판 포화에 3~43 L이 필요한 반면, AR≈43 홀에서는 9,000 L이 필요하여 약 200~3,000배에 달합니다.
-
- **핵심 구분 — 이 두 비율을 혼동하지 마세요** :
-
-| 비율                 | 정의                  | 의미                                                        |
-| -------------------- | --------------------- | ----------------------------------------------------------- |
-| **Dose Multiple**    | E_req(HAR) / E_flat   | "평탄 대비 몇 배 어려운가" →**Gordon Required에 이미 포함** |
-| **Saturation Ratio** | E_actual / E_req(HAR) | "현재 공급량이 충분한가" →**≥100%이면 conformal 달성**      |
-
-Dose Multiple이 500×라는 것은 "이 구조는 평탄 기판보다 500배 어렵다"는 뜻이지, Required Exposure에 다시 500을 곱해야 한다는 뜻이 아닙니다. Required Exposure에 이미 이 배수가 포함되어 있습니다.
-
-### 6.4 포화도 (Saturation Ratio) 해석
-
-| 포화도 | 코팅 상태             | 조치                     |
-| ------ | --------------------- | ------------------------ |
-| ≥ 100% | 바닥까지 conformal    | 현 조건 유지             |
-| 90~99% | 하단 약간 얇아짐      | 도징 시간 소폭 증가      |
-| 70~89% | 하단 상당 부분 미코팅 | 시간/압력 1.2~1.5배 증가 |
-| < 50%  | 유의미한 코팅 불가    | 근본적 조건 변경 필요    |
-
-### 6.5 Fill Tank Model A vs B
-
-| Model            | 정의                     | 의미              |
-| ---------------- | ------------------------ | ----------------- |
-| A: P_eq × t_dose | 상한 (P가 일정하다 가정) | 낙관적            |
-| B: ODE 수치적분  | 실제 압력 변화 반영      | **현실적 (권장)** |
-
-차이 > 20%이면: t_dose < τ → 도징 시간 연장 효과적 / t_dose > τ → ΔP 또는 V_fill 증대 필요
-
----
-
-## 7. 그래프 탭 활용법
-
-| 탭                       | 답해주는 질문                                            |
-| ------------------------ | -------------------------------------------------------- |
-| Exposure vs EAR          | 구조 shrink 시 노출량이 얼마나 증가하나? (EAR² 스케일링) |
-| Pulse Time vs P          | 어떤 압력에서 목표 도징 시간을 달성하나?                 |
-| Pulse Time vs T          | 공정 온도 변경이 도징 시간에 미치는 영향?                |
-| EAR Structure Comparison | 같은 AR의 Hole vs Trench 코팅 난이도 차이?               |
-
----
-
-## 8. Fill Tank 모델 상세
-
-### ODE 수식
-
-```
-dP_f/dt = −C(P_f − P_c) / V_f        (fill tank 압력 감소)
-dP_c/dt =  C(P_f − P_c) / V_c − S·P_c / V_c   (챔버 압력)
-```
-
-### 핵심 파라미터
-
-* **P_eq = ΔP × V_fill / V_chamber** : 평형 챔버 압력
-* **τ = V_chamber / S_pump** : 시상수
-* **E_max = P_eq × τ** : 달성 가능 최대 노출량
-
-### 판단 기준
-
-| 조건               | 대응                              |
-| ------------------ | --------------------------------- |
-| E_max > E_required | t_dose ≥ t_full로 설정            |
-| E_max < E_required | ΔP↑, V_fill↑, 또는 S_pump↓        |
-| t_dose/τ < 0.5     | 도징 시간 연장이 효과적           |
-| t_dose/τ > 3       | 추가 시간 효과 미미, ΔP 증대 필요 |
-
----
-
-## 9. 단위 체계 및 검증
-
-### 9.1 압력 단위 처리
-
-계산기는 **Torr와 mTorr 중 선택 가능**합니다 (사이드바의 "압력 단위" 라디오 버튼).
-
-내부 변환 경로:
-
-```
-Torr 모드:  사용자 입력 [Torr]  → P_Torr          → Torr_to_Pa() → P_Pa [Pa]
-mTorr 모드: 사용자 입력 [mTorr] → ÷1000 → P_Torr  → Torr_to_Pa() → P_Pa [Pa]
-```
-
-**모든 내부 계산은 SI 단위(Pa)로 수행**됩니다. 하드코딩된 변환 상수(`0.133322`, `/133.322`)는 코드 전체에서 제거되었으며, 변환은 오직 `Torr_to_Pa()`, `Pa_to_Torr()`, `Pa_s_to_L()` 함수만을 통해 이루어집니다.
-
-### 9.2 전체 단위 흐름
-
-```
-입력 단위     SI 변환              계산                출력 단위
-──────────   ──────────────────   ────────────────   ─────────
-μm           → m  (×10⁻⁶)        gordon_a → a       [무차원]
-nm           → m  (×10⁻⁹)
-°C           → K  (+273.15)
-Torr/mTorr   → Pa (Torr_to_Pa)   E = scale × f(a)   Pa·s → L
-g/mol        → kg (×10⁻³/N_A)    t = E / P          s
-Å            → m  (×10⁻¹⁰)       λ = kBT/(..d²P)    m → nm
-nm, g/cm³    → K_max [1/m²]      Kn = λ/w           [무차원]
-cc           → m³ (×10⁻⁶)        Fill Tank ODE
-L            → m³ (×10⁻³)          P_c(t)            Pa → Torr
-L/s          → m³/s (×10⁻³)        E_cum(t)          Pa·s → L
-```
-
-### 9.3 검증 방법
-
-```bash
-python run_tests.py     # 44개 자동 검증 테스트
-```
-
-검증 항목:
-
-* 물리 상수 (k_B, N_A) CODATA 2018 정확값 확인
-* 단위 변환 함수 왕복 검증 (Torr↔Pa, Pa·s↔L)
-* K_max 차원 분석: [m]×[g/m³]×[/mol]/[g/mol] = [molecules/m²]
-* Required Exposure: 두 가지 독립 경로로 계산 → 완전 일치
-* Torr vs mTorr 입력 시 동일 결과 확인
-* Fill Tank ODE vs 해석해: 상대 오차 < 2%
-
----
-
-## 10. 단위 테스트
-
-```bash
-python run_tests.py          # Standalone (streamlit 불필요)
-pytest test_gordon_calculator.py -v   # pytest 사용 시
-```
-
-44개 테스트 항목:
-
-* 단위 변환 정확도 (3개)
-* Gordon EAR 계산 (4개)
-* K_max 추정 (1개)
-* 평균 자유 경로 (2개)
-* Fill Tank ODE vs 해석해 (22개)
-* 침투 깊이 (3개)
-* find_t_full (4개)
-* 입력 검증 (3개)
-* Gordon 노출량 공식 (2개)
-
----
-
-## 11. 제한사항 및 주의사항
-
-### 모델 한계
-
-1. **s₀ = 1 가정** : Gordon 모델은 완전 diffusion-limited 경우를 계산. s₀ < 1이면 실제 프로파일이 더 완만하므로, 노출량은 **보수적 상한**
-2. **1차 Langmuir 흡착** : s(θ) = s₀(1−θ)만 고려. 복잡한 반응 메커니즘 미반영
-3. **등온 가정** : 구조 내부 온도 구배 미고려
-4. **이상 기체 가정** : 저압(< 수 Torr)에서 유효
-
-### 실무 주의사항
-
-1. **Kn < 1** : Gordon 모델 부적합. CFD 시뮬레이션 권장
-2. **K_max 오차** : GPC 기반 추정은 ±20~50%. 정밀 공정은 QCM 실측 필요
-3. **Precursor 열분해** : 고온에서 CVD 성분 혼입 가능. Gordon 모델은 순수 ALD만 고려
-4. **표면 화학 불균일** : 구조 내부의 표면 화학이 깊이에 따라 다르면 s₀가 위치 의존 → 정확도 저하
-
----
-
-## 12. 참고문헌
-
-1. R. G. Gordon et al., "A Kinetic Model for Step Coverage by ALD in Narrow Holes or Trenches," *Chem. Vap. Deposition*  **9** , 73–78 (2003)
-2. V. Cremers et al., "Conformality in ALD: Current Status Overview of Analysis and Modelling," *Appl. Phys. Rev.*  **6** , 021302 (2019)
-3. H. C. M. Knoops et al., "Conformality of Plasma-Assisted ALD: Physical Processes and Modeling," *J. Electrochem. Soc.*  **157** , G241–G249 (2010)
-4. S. M. Sze, M. K. Lee,  *Semiconductor Devices: Physics and Technology* , 3rd Ed., Wiley (2012)
-
----
-
-*ALD Gordon Model Calculator v5 — 2025*
+*Gordon ALD Conformality Calculator · 모델: Gordon et al. (2003) · 리뷰: Cremers et al. (2019).
+결과는 모델 가정(s=1·분자흐름·확산제한)에 의존하며 절대값은 차수 수준으로 해석하십시오.*
