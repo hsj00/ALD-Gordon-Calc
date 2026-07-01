@@ -55,10 +55,13 @@ def curve_geometry_comparison(K_max, m, T, lw_min=5.0, lw_max=25.0, n=300):
 
 # ------------------------------- Figure -------------------------------
 def fig_exposure_vs_ear(K_max, m, T, current_a=None, ear_min=1.0, ear_max=100.0,
-                        budget_dose_L=None):
+                        budget_dose_L=None, s_stick=1.0):
     a, Pt_L = curve_exposure_vs_ear(K_max, m, T, ear_min, ear_max)
     fig, ax = plt.subplots(figsize=(5.2, 3.6))
-    ax.loglog(a, Pt_L, color=_CURVE, lw=2, label="Eq.(14)")
+    ax.loglog(a, Pt_L, color=_CURVE, lw=2, label="Eq.(14), s=1")
+    if s_stick < 1.0:
+        ax.fill_between(a, Pt_L, Pt_L / s_stick, alpha=0.15, color=_CURVE,
+                        label=f"reaction-limited (×1/s, s={s_stick:g})")
     if budget_dose_L is not None and budget_dose_L > 0:
         ax.axhline(budget_dose_L, color="#7f8c8d", ls="--", lw=1.2,
                    label=f"budget ({budget_dose_L:,.0f} L)")
@@ -77,12 +80,18 @@ def fig_exposure_vs_ear(K_max, m, T, current_a=None, ear_min=1.0, ear_max=100.0,
 
 
 def fig_penetration_vs_dose(K_max, m, T, w, current_dose_L=None, dose_max_L=None,
-                            target_depth_m=None):
+                            target_depth_m=None, s_stick=1.0):
     if dose_max_L is None:
         dose_max_L = (current_dose_L or 1000.0) * 1.5
     dose_L, l_um = curve_penetration_vs_dose(K_max, m, T, w, dose_max_L)
     fig, ax = plt.subplots(figsize=(5.2, 3.6))
-    ax.plot(dose_L, l_um, color=_PEN, lw=2, label="Eq.(24)")
+    ax.plot(dose_L, l_um, color=_PEN, lw=2, label="Eq.(24), s=1")
+    if s_stick < 1.0:
+        flat = phys.flat_saturation_exposure(K_max, m, T)
+        E_lo = u.to_pa_s(dose_L, "L") * s_stick / flat
+        l_lo = (4.0 * w / 3.0) * (np.sqrt(1.0 + (3.0 / 8.0) * E_lo) - 1.0) * 1e6
+        ax.fill_between(dose_L, l_lo, l_um, alpha=0.15, color=_PEN,
+                        label=f"reaction-limited (s={s_stick:g})")
     if target_depth_m is not None:
         ax.axhline(target_depth_m * 1e6, color="#7f8c8d", ls="--", lw=1.2, label="target depth L")
     if current_dose_L is not None:
@@ -97,7 +106,7 @@ def fig_penetration_vs_dose(K_max, m, T, w, current_dose_L=None, dose_max_L=None
 
 
 def fig_penetration_vs_time(K_max, m, T, w, P, current_t=None, t_max=None,
-                            target_depth_m=None, show_ear=True):
+                            target_depth_m=None, show_ear=True, s_stick=1.0):
     if t_max is None:
         if target_depth_m is not None:
             t_ref = phys.feeding_time_for_depth(target_depth_m, P, w, K_max, m, T)
@@ -106,7 +115,13 @@ def fig_penetration_vs_time(K_max, m, T, w, P, current_t=None, t_max=None,
         t_max = max(t_ref * 3.0, (current_t or 0.0) * 1.3, 1.0)
     t, l_um, _ = curve_penetration_vs_time(K_max, m, T, w, P, t_max)
     fig, ax = plt.subplots(figsize=(5.4, 3.7))
-    ax.plot(t, l_um, color=_TIME, lw=2, label="Eq.(24),  Pt=P·t")
+    ax.plot(t, l_um, color=_TIME, lw=2, label="Eq.(24), s=1,  Pt=P·t")
+    if s_stick < 1.0:
+        flat = phys.flat_saturation_exposure(K_max, m, T)
+        E_lo = (P * t) * s_stick / flat
+        l_lo = (4.0 * w / 3.0) * (np.sqrt(1.0 + (3.0 / 8.0) * E_lo) - 1.0) * 1e6
+        ax.fill_between(t, l_lo, l_um, alpha=0.15, color=_TIME,
+                        label=f"reaction-limited (s={s_stick:g})")
     if target_depth_m is not None:
         ax.axhline(target_depth_m * 1e6, color="#7f8c8d", ls="--", lw=1.2, label="target depth L")
     if current_t is not None and current_t > 0:
@@ -150,10 +165,14 @@ def fig_multicycle_ear(n, ear, w_nm):
     fig.tight_layout(); return fig
 
 
-def fig_multicycle_penetration(n, l_um):
-    """고정 per-cycle 노출에서 사이클별 침투 깊이."""
+def fig_multicycle_penetration(n, l_um, l_lo_um=None, s_stick=1.0):
+    """고정 per-cycle 노출에서 사이클별 침투 깊이. l_lo_um 주면 반응제한 밴드 표시."""
     fig, ax = plt.subplots(figsize=(5.4, 3.7))
-    ax.plot(n, l_um, color=_PEN, lw=2)
+    ax.plot(n, l_um, color=_PEN, lw=2, label="s=1" if l_lo_um is not None else None)
+    if l_lo_um is not None:
+        ax.fill_between(n, l_lo_um, l_um, alpha=0.15, color=_PEN,
+                        label=f"reaction-limited (s={s_stick:g})")
+        ax.legend(fontsize=8)
     ax.set_xlabel("ALD cycle")
     ax.set_ylabel(r"Penetration depth per cycle ($\mu$m)")
     ax.set_title("Penetration depth vs cycle  (fixed per-cycle dose)")

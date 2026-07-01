@@ -258,7 +258,9 @@ if forward:
     c1.metric("필요 노출량", fmt_exp(Pt))
     c2.metric("필요 노출량 (SI)", f"{Pt:.3e} Pa·s")
     if pulse_t is not None:
-        st.metric(f"필요 펄스 시간 (P={P_in:g} {pres_unit}, Eq.14 기준)", f"{pulse_t:,.1f} s")
+        t_str = (f"{pulse_t:,.1f} s" if s_stick >= 1.0
+                 else f"{pulse_t:,.1f} ~ {pulse_t / s_stick:,.1f} s")
+        st.metric(f"필요 펄스 시간 (P={P_in:g} {pres_unit}, Eq.14 기준)", t_str)
     st.caption(f"Pt = (Pt)_flat × (1 + 19/4·a + 3/2·a²) = {fmt_exp(flat_pa_s)} × "
                f"(1 + {19/4*a:.1f} + {1.5*a*a:.1f})")
     if s_stick < 1.0:
@@ -382,16 +384,18 @@ def dl_buttons(fig, colnames, columns, base):
 tabs = st.tabs(["노출량 – EAR", "침투깊이 – 노출량", "침투깊이 – feeding time", "기하 비교 (Fig.17)"])
 
 with tabs[0]:
-    figA = plots.fig_exposure_vs_ear(K_max, m, T, current_a=a, ear_max=ear_max, budget_dose_L=budget_L)
+    figA = plots.fig_exposure_vs_ear(K_max, m, T, current_a=a, ear_max=ear_max,
+                                     budget_dose_L=budget_L, s_stick=s_stick)
     st.pyplot(figA)
     xa, ya = plots.curve_exposure_vs_ear(K_max, m, T, ear_max=ear_max)
     dl_buttons(figA, ["EAR", "Required_exposure_L"], [xa, ya], "exposure_vs_EAR")
     plt.close(figA)
-    st.caption("Eq.(14): 노출량 ∝ EAR²(고AR). 빨간 점 = 현재 구조.")
+    st.caption("Eq.(14): 노출량 ∝ EAR²(고AR). 빨간 점 = 현재 구조."
+               + ("" if s_stick >= 1.0 else f"  음영=반응제한 범위(×1/s, s={s_stick:g})."))
 
 with tabs[1]:
     figB = plots.fig_penetration_vs_dose(K_max, m, T, w, current_dose_L=cur_dose_L,
-                                         dose_max_L=dose_max_L, target_depth_m=L)
+                                         dose_max_L=dose_max_L, target_depth_m=L, s_stick=s_stick)
     st.pyplot(figB)
     xb, yb = plots.curve_penetration_vs_dose(K_max, m, T, w, dose_max_L)
     dl_buttons(figB, ["Exposure_L", "Penetration_depth_um"], [xb, yb], "pendepth_vs_dose")
@@ -402,14 +406,16 @@ with tabs[1]:
 with tabs[2]:
     if P > 0:
         figD = plots.fig_penetration_vs_time(K_max, m, T, w, P, current_t=cur_t,
-                                             t_max=t_max, target_depth_m=L)
+                                             t_max=t_max, target_depth_m=L, s_stick=s_stick)
         st.pyplot(figD)
         xd, yd, ed = plots.curve_penetration_vs_time(K_max, m, T, w, P, t_max)
         dl_buttons(figD, ["Feeding_time_s", "Penetration_depth_um", "coated_EAR_hole"],
                    [xd, yd, ed], "pendepth_vs_time")
         plt.close(figD)
+        tr_str = (f"{t_reach:,.1f} s" if s_stick >= 1.0
+                  else f"{t_reach:,.1f} ~ {t_reach / s_stick:,.1f} s")
         st.metric(f"목표 깊이 L={u.from_m(L,'µm'):.2f} µm 도달 feeding time (P={P_in:g} {pres_unit})",
-                  f"{t_reach:,.1f} s")
+                  tr_str)
         st.caption("Eq.(24)를 Pt=P·t 로 치환. l ∝ √t (깊이 2배 ≈ 시간 4배). "
                    "⚠️ P 일정 가정 — 반응기 고갈·펄스 rise/fall 무시, 실측 시간은 더 클 수 있음."
                    + ("" if is_hole else " 침투 깊이 4w/3는 원형 홀 기준(트렌치/pillar 근사)."))
@@ -471,20 +477,29 @@ if st.checkbox("다중 사이클 분석 활성화", value=False):
                 Pt_cycle = P * t_pulse_mc
                 n_p, l_p = multicycle.penetration_per_cycle(geom, L, w, gpc_m, Pt_cycle,
                                                             K_max, m, T, int(n_cyc), z)
-                figP = plots.fig_multicycle_penetration(n_p, l_p * 1e6)
+                if s_stick < 1.0:
+                    _, l_p_lo = multicycle.penetration_per_cycle(
+                        geom, L, w, gpc_m, Pt_cycle * s_stick, K_max, m, T, int(n_cyc), z)
+                    figP = plots.fig_multicycle_penetration(n_p, l_p * 1e6, l_lo_um=l_p_lo * 1e6,
+                                                            s_stick=s_stick)
+                    csv_cols = (["cycle", "penetration_um_s1", "penetration_um_reaction_limited"],
+                                [n_p, l_p * 1e6, l_p_lo * 1e6])
+                else:
+                    figP = plots.fig_multicycle_penetration(n_p, l_p * 1e6)
+                    csv_cols = (["cycle", "penetration_um"], [n_p, l_p * 1e6])
                 st.pyplot(figP)
                 cc1, cc2 = st.columns(2)
                 cc1.download_button("⬇️ PNG", data=export.fig_png_bytes(figP),
                                     file_name="multicycle_penetration.png", mime="image/png",
                                     key="png_mc_pen")
                 cc2.download_button("⬇️ 데이터 CSV",
-                                    data=export.series_csv(["cycle", "penetration_um"],
-                                                           [n_p, l_p*1e6]),
+                                    data=export.series_csv(csv_cols[0], csv_cols[1]),
                                     file_name="multicycle_penetration.csv", mime="text/csv",
                                     key="csv_mc_pen")
                 plt.close(figP)
                 st.caption(f"per-cycle 노출 Pt = P·t = {P_in:g} {pres_unit} × {t_pulse_mc:g} s. "
-                           "l ∝ w 이므로 폭이 줄며 침투 깊이 감소(Perez/Gordon).")
+                           "l ∝ w 이므로 폭이 줄며 침투 깊이 감소(Perez/Gordon)."
+                           + ("" if s_stick >= 1.0 else f" 음영=반응제한(s={s_stick:g}) 범위."))
             else:
                 st.warning("분압 P > 0 및 사이클당 펄스시간 > 0 을 입력하면 표시됩니다.")
 
